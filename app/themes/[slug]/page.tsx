@@ -1,8 +1,13 @@
 import Link from "next/link";
 
+import { MockAirbnb } from "@/components/mocks/mock-airbnb";
 import { MockApple } from "@/components/mocks/mock-apple";
+import { MockBubbly } from "@/components/mocks/mock-bubbly";
+import { MockGlass } from "@/components/mocks/mock-glass";
 import { MockLinear } from "@/components/mocks/mock-linear";
 import { MockNeobrutalism } from "@/components/mocks/mock-neobrutalism";
+import { MockNotion } from "@/components/mocks/mock-notion";
+import { MockSpotify } from "@/components/mocks/mock-spotify";
 import { MockStripe } from "@/components/mocks/mock-stripe";
 import { MockVercel } from "@/components/mocks/mock-vercel";
 import { THEMES } from "@/lib/themes";
@@ -13,6 +18,11 @@ const MOCKS: Record<string, React.ComponentType> = {
   linear: MockLinear,
   stripe: MockStripe,
   vercel: MockVercel,
+  notion: MockNotion,
+  airbnb: MockAirbnb,
+  spotify: MockSpotify,
+  glass: MockGlass,
+  bubbly: MockBubbly,
 };
 
 export default async function ThemePreviewPage({

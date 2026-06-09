@@ -48,6 +48,46 @@ export const THEMES: ThemeMeta[] = [
     swatch: "#000000",
     bg: "#ffffff",
   },
+  {
+    slug: "notion",
+    name: "Notion Docs",
+    tagline:
+      "A soft, document-like database view with an emoji sidebar. Calm and organized.",
+    swatch: "#2383e2",
+    bg: "#ffffff",
+  },
+  {
+    slug: "airbnb",
+    name: "Marketplace",
+    tagline:
+      "Warm coral accent, a rounded search pill, and image-topped cards. Consumer-friendly.",
+    swatch: "#ff385c",
+    bg: "#ffffff",
+  },
+  {
+    slug: "spotify",
+    name: "Vibrant Dark",
+    tagline:
+      "Black canvas, neon green, album-art cards. Bold and energetic.",
+    swatch: "#1db954",
+    bg: "#121212",
+  },
+  {
+    slug: "glass",
+    name: "Glassmorphism",
+    tagline:
+      "Frosted translucent cards floating over a vivid gradient. Trendy and dreamy.",
+    swatch: "#c850c0",
+    bg: "linear-gradient(135deg,#6d5efc,#c850c0,#ffcc70)",
+  },
+  {
+    slug: "bubbly",
+    name: "Playful Pop",
+    tagline:
+      "Big rounded cards, pastel multi-color accents, chunky buttons. Friendly and fun.",
+    swatch: "#9b5de5",
+    bg: "#fffaf3",
+  },
 ];
 
 export function getTheme(slug: string): ThemeMeta | undefined {
