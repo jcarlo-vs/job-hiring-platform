@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { applicationSubmitted, inngest } from "@/lib/inngest/client";
 import {
   RESUME_BUCKET,
   RESUME_CONTENT_TYPES,
@@ -165,8 +166,70 @@ export async function applyToJob(jobId: string): Promise<ActionResult> {
     };
   }
 
-  // Phase 4 enqueues AI screening here; screening_status stays PENDING for now.
+  // Enqueue AI screening. Best-effort: the application is already saved, so a
+  // transient queue error must not fail the apply - the row stays PENDING and an
+  // employer can re-screen it. The worker flips it to PROCESSING then DONE/ERROR.
+  try {
+    await inngest.send({
+      name: applicationSubmitted.event,
+      data: { applicationId: appId },
+    });
+  } catch (err) {
+    console.error(`[apply] failed to enqueue screening for ${appId}:`, err);
+  }
+
   revalidatePath("/applications");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/**
+ * Employer-only: re-run AI screening for an application on one of their jobs.
+ * Resets the row to PENDING and re-enqueues. Ownership is verified here, and the
+ * status reset uses the service-role client so it does not depend on an employer
+ * UPDATE policy on applications (the employer applicant UI lands in Phase 5).
+ */
+export async function rescreenApplication(
+  applicationId: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Please sign in." };
+
+  const admin = createAdminClient();
+  const { data: app } = await admin
+    .from("applications")
+    .select("job_id")
+    .eq("id", applicationId)
+    .single();
+  if (!app) return { ok: false, error: "Application not found." };
+
+  const { data: job } = await admin
+    .from("jobs")
+    .select("employer_id")
+    .eq("id", app.job_id)
+    .single();
+  if (!job || job.employer_id !== user.id) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const { error } = await admin
+    .from("applications")
+    .update({ screening_status: "PENDING" })
+    .eq("id", applicationId);
+  if (error) return { ok: false, error: "Could not reset screening." };
+
+  try {
+    await inngest.send({
+      name: applicationSubmitted.event,
+      data: { applicationId },
+    });
+  } catch {
+    return { ok: false, error: "Could not queue re-screening. Please retry." };
+  }
+
   revalidatePath("/dashboard");
   return { ok: true };
 }
