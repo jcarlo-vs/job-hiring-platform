@@ -14,6 +14,12 @@ export async function SiteHeader() {
         </Link>
 
         <nav className="text-muted flex items-center gap-4 text-sm">
+          <Link
+            href="/jobs"
+            className="hover:text-foreground transition-colors"
+          >
+            Jobs
+          </Link>
           {profile ? (
             <>
               <Link

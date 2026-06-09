@@ -107,6 +107,7 @@ export type Database = {
           description: string
           employer_id: string
           employment_type: Database["public"]["Enums"]["employment_type"]
+          expires_at: string | null
           id: string
           location: string | null
           requirements: string
@@ -121,6 +122,7 @@ export type Database = {
           description: string
           employer_id: string
           employment_type: Database["public"]["Enums"]["employment_type"]
+          expires_at?: string | null
           id?: string
           location?: string | null
           requirements: string
@@ -135,6 +137,7 @@ export type Database = {
           description?: string
           employer_id?: string
           employment_type?: Database["public"]["Enums"]["employment_type"]
+          expires_at?: string | null
           id?: string
           location?: string | null
           requirements?: string

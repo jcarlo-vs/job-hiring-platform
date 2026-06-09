@@ -1,6 +1,6 @@
 # Project Progress
 
-**Current phase:** Phase 1 ✅ complete → Phase 2 (not started)
+**Current phase:** Phase 2 ✅ complete → Phase 3 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
@@ -26,12 +26,13 @@
 
 
 ## Phase 2 - Jobs (employer create/manage) + public browse
-- [ ] Employer: create job (title, description, requirements, location, salary, type, work mode)
-- [ ] Employer: edit, close/reopen, list own jobs
-- [ ] Public: browse all OPEN jobs (card list) + single job detail page
-- [ ] Search + filters (keyword, location, type, work mode, salary range)
-- [ ] Pagination (or infinite scroll)
-- [ ] Empty/loading/error states
+- [x] Employer: create job (title, description, requirements, location, salary, type, work mode)  <!-- + employer-set expiry (default 30 days); employer-insert RLS verified via real token -->
+- [x] Employer: edit, close/reopen, list own jobs  <!-- dashboard lists active/expired/closed; edit + close/reopen actions -->
+- [x] Public: browse all OPEN jobs (card list) + single job detail page  <!-- expired/closed hidden from board + detail (no content leak) -->
+- [x] Search + filters (keyword, location, type, work mode, salary range)  <!-- GET form; ilike keyword across title/description/requirements; verified -->
+- [x] Pagination (or infinite scroll)  <!-- page-based, 9 per page, exact count -->
+- [x] Empty/loading/error states  <!-- empty state, loading.tsx skeleton, error.tsx boundary -->
+- [x] (added) Job-post expiry: employer-set expires_at, hidden on expiry, "Expired" section on dashboard, apply blocked by RLS
 
 ## Phase 3 - Applications (applicant side)
 - [ ] Resume upload to the resumes bucket via signed upload URL; validate type (PDF/DOCX) and size
