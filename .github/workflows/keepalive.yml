@@ -1,9 +1,13 @@
 name: supabase-keepalive
 
-# Pings the deployed /api/health route, which runs a real DB query so Supabase's
-# free-tier inactivity timer (~7 days) is reset. Runs twice a week to absorb
-# GitHub's best-effort cron delays. The keepalive-workflow step prevents GitHub
-# from auto-disabling this schedule after 60 days of repo inactivity.
+# Pings the deployed /api/health route (which runs a real DB query) so
+# Supabase's free-tier inactivity pause (~7 days) is reset. Runs twice a week
+# to absorb GitHub's best-effort cron delays.
+#
+# Uses NO third-party actions (only preinstalled `curl` + `gh`) so it works
+# regardless of the account's Actions policy. The second step reimplements the
+# "keepalive commit" inline to stop GitHub auto-disabling this schedule after
+# 60 days of repo inactivity.
 
 on:
   schedule:
@@ -11,19 +15,36 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write # required for the keepalive commit
+  contents: write # for the inactivity keepalive commit
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Ping health endpoint (runs a DB query)
         run: |
           curl --fail-with-body -sS \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://job-hiring-platform-eight.vercel.app/api/health"
 
-      - name: Keep this scheduled workflow enabled
-        uses: gautamkrishnar/keepalive-workflow@v2
+      - name: Prevent 60-day scheduled-workflow auto-disable
+        if: ${{ github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          last_iso=$(gh api "repos/$REPO/commits/$BRANCH" --jq '.commit.committer.date')
+          days=$(( ( $(date +%s) - $(date -d "$last_iso" +%s) ) / 86400 ))
+          echo "Days since last commit: $days"
+          if [ "$days" -lt 50 ]; then
+            echo "Repo active within 50 days; no keepalive commit needed."
+            exit 0
+          fi
+          parent=$(gh api "repos/$REPO/git/refs/heads/$BRANCH" --jq '.object.sha')
+          tree=$(gh api "repos/$REPO/git/commits/$parent" --jq '.tree.sha')
+          new=$(gh api -X POST "repos/$REPO/git/commits" \
+            -f message="chore: keepalive (reset 60-day workflow timer)" \
+            -f tree="$tree" -f "parents[]=$parent" --jq '.sha')
+          gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH" -f sha="$new"
+          echo "Created keepalive commit $new"
