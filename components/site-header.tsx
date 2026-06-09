@@ -28,6 +28,14 @@ export async function SiteHeader() {
               >
                 Dashboard
               </Link>
+              {profile.role === "APPLICANT" && (
+                <Link
+                  href="/applications"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Applications
+                </Link>
+              )}
               <span className="hidden text-xs tracking-wide uppercase sm:inline">
                 {profile.role === "EMPLOYER" ? "Employer" : "Job seeker"}
               </span>

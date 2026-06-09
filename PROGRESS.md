@@ -1,6 +1,6 @@
 # Project Progress
 
-**Current phase:** Phase 2 ✅ complete → Phase 3 (not started)
+**Current phase:** Phase 3 ✅ complete → (pick a theme) → Phase 4 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
@@ -35,11 +35,12 @@
 - [x] (added) Job-post expiry: employer-set expires_at, hidden on expiry, "Expired" section on dashboard, apply blocked by RLS
 
 ## Phase 3 - Applications (applicant side)
-- [ ] Resume upload to the resumes bucket via signed upload URL; validate type (PDF/DOCX) and size
-- [ ] Apply to a job → create applications row (stage APPLIED, screening_status PENDING)
-- [ ] Enforce one application per job per applicant
-- [ ] "My applications" page: job title, date, current stage, screening status
-- [ ] Confirmation UI ("Application received - screening in progress")
+- [x] Resume upload to the resumes bucket via signed upload URL; validate type (PDF/DOCX) and size  <!-- profile default resume; server signed upload URL (service role); bucket-enforced type/size -->
+- [x] Apply to a job → create applications row (stage APPLIED, screening_status PENDING)  <!-- apply modal; resume snapshotted to resumes/{jobId}/{appId}.ext -->
+- [x] Enforce one application per job per applicant  <!-- unique constraint; verified 23505 -->
+- [x] "My applications" page: job title, date, current stage, screening status  <!-- /applications; reads applied-to job titles via has_application policy -->
+- [x] Confirmation UI ("Application received - screening in progress")
+- [x] (verified) signed-URL upload, apply+snapshot, RLS isolation via Node script using real client libs
 
 ## Phase 4 - AI screening pipeline (centerpiece)
 - [ ] Set up Inngest and a screening function

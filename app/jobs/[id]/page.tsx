@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { closeJob, reopenJob } from "@/app/jobs/actions";
+import { ApplyButton } from "@/components/apply-button";
 import {
   EMPLOYMENT_TYPE_LABELS,
   WORK_MODE_LABELS,
@@ -35,6 +36,28 @@ export default async function JobDetailPage({
   // Non-owners may only view open, unexpired jobs.
   if (!isOwner && (job.status !== "OPEN" || expired)) {
     return <JobUnavailable />;
+  }
+
+  let viewerRole: string | null = null;
+  let hasResume = false;
+  let resumeFilename: string | null = null;
+  let alreadyApplied = false;
+  if (user && !isOwner) {
+    const { data: vp } = await supabase
+      .from("profiles")
+      .select("role, resume_path, resume_filename")
+      .eq("id", user.id)
+      .single();
+    viewerRole = vp?.role ?? null;
+    hasResume = !!vp?.resume_path;
+    resumeFilename = vp?.resume_filename ?? null;
+    const { data: existing } = await supabase
+      .from("applications")
+      .select("id")
+      .eq("job_id", job.id)
+      .eq("applicant_id", user.id)
+      .maybeSingle();
+    alreadyApplied = !!existing;
   }
 
   const salary = formatSalary(job.salary_min, job.salary_max);
@@ -105,15 +128,24 @@ export default async function JobDetailPage({
           </Link>
         ) : isOwner ? (
           <p className="text-muted text-sm">This is your job posting.</p>
+        ) : alreadyApplied ? (
+          <p className="text-muted text-sm">
+            You have applied to this job. See{" "}
+            <Link href="/applications" className="text-primary hover:underline">
+              My applications
+            </Link>
+            .
+          </p>
+        ) : viewerRole === "APPLICANT" ? (
+          <ApplyButton
+            jobId={job.id}
+            hasResume={hasResume}
+            resumeFilename={resumeFilename}
+          />
         ) : (
-          <div>
-            <button type="button" disabled className="btn-primary">
-              Apply
-            </button>
-            <p className="text-muted mt-2 text-xs">
-              Applying with your profile resume opens in the next update.
-            </p>
-          </div>
+          <p className="text-muted text-sm">
+            Only job seekers can apply to jobs.
+          </p>
         )}
       </div>
     </article>

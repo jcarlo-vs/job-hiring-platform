@@ -162,18 +162,27 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          resume_filename: string | null
+          resume_path: string | null
+          resume_uploaded_at: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
           full_name?: string | null
           id: string
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_uploaded_at?: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
           full_name?: string | null
           id?: string
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_uploaded_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
