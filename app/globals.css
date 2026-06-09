@@ -34,3 +34,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+@layer components {
+  .field-label {
+    @apply mb-1 block text-sm font-medium;
+  }
+  .field-input {
+    @apply border-border bg-background focus:border-primary w-full rounded-md border px-3 py-2 text-sm outline-none;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60;
+  }
+  .form-error {
+    @apply rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700;
+  }
+  .form-note {
+    @apply rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800;
+  }
+}

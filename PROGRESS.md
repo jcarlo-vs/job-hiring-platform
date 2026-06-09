@@ -1,6 +1,6 @@
 # Project Progress
 
-**Current phase:** Phase 0 ✅ complete → Phase 1 (not started)
+**Current phase:** Phase 1 (in progress)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
@@ -18,11 +18,12 @@
 - [x] App layout/shell
 
 ## Phase 1 — Auth & roles (with RLS)
-- [ ] Email/password auth (sign up, log in, log out, sessions) via Supabase Auth
-- [ ] On signup, create a profiles row with chosen role (Applicant vs Employer)
-- [ ] Protected routes / middleware; redirect unauthenticated users
-- [ ] Role-based landing (applicant home vs employer dashboard)
-- [ ] Write and test RLS policies for profiles, jobs, applications, and the resumes bucket
+- [ ] Email/password auth (sign up, log in, log out, sessions) via Supabase Auth  <!-- UI + server actions built; end-to-end prod verify pending the email-confirmation toggle -->
+- [x] On signup, create a profiles row with chosen role (Applicant vs Employer)  <!-- handle_new_user trigger verified: profiles auto-created with correct roles -->
+- [x] Protected routes / middleware; redirect unauthenticated users  <!-- verified: /dashboard -> /login?next=, auth-page skip -->
+- [ ] Role-based landing (applicant home vs employer dashboard)  <!-- /dashboard branches by role; prod login verify pending toggle -->
+- [x] Write and test RLS policies for profiles, jobs, applications, and the resumes bucket  <!-- verified via role impersonation: read isolation + WITH CHECK write enforcement; advisors clean -->
+
 
 ## Phase 2 — Jobs (employer create/manage) + public browse
 - [ ] Employer: create job (title, description, requirements, location, salary, type, work mode)
