@@ -1,20 +1,20 @@
 # Project Progress
 
 **Current phase:** Phase 0
-**Live URL:** (add once deployed)
+**Live URL:** https://job-hiring-platform-eight.vercel.app
 **Last updated:** 2026-06-09
 
 ## Phase 0 — Project setup & foundations
-- [ ] Initialize Next.js + TypeScript + Tailwind; set up ESLint/Prettier
-- [ ] Create a Supabase project; add URL + keys to env (.env and .env.example)
-- [ ] Wire up `@supabase/ssr` (server + client helpers)
-- [ ] Create profiles, jobs, applications tables (SQL migration)
-- [ ] Create the private `resumes` storage bucket
-- [ ] Add ANTHROPIC_API_KEY, Inngest keys, Resend key to env
-- [ ] Add a /api/health route that runs a trivial DB query
-- [ ] Deploy a "hello world" to Vercel; confirm Supabase connectivity in prod
-- [ ] Add a GitHub Actions cron (every few days) that curls /api/health to keep the free-tier Supabase project from pausing
-- [ ] App layout/shell
+- [x] Initialize Next.js + TypeScript + Tailwind; set up ESLint/Prettier
+- [x] Create a Supabase project; add URL + keys to env (.env and .env.example)
+- [x] Wire up `@supabase/ssr` (server + client helpers)
+- [x] Create profiles, jobs, applications tables (SQL migration)
+- [x] Create the private `resumes` storage bucket
+- [ ] Add ANTHROPIC_API_KEY, Inngest keys, Resend key to env  <!-- placeholders in .env.example/.env.local; real values added in their phases (Anthropic/Resend = user-provided; Inngest = Vercel integration) -->
+- [x] Add a /api/health route that runs a trivial DB query
+- [x] Deploy a "hello world" to Vercel; confirm Supabase connectivity in prod
+- [ ] Add a GitHub Actions cron (every few days) that curls /api/health to keep the free-tier Supabase project from pausing  <!-- workflow written; awaiting GitHub repo to push + verify -->
+- [x] App layout/shell
 
 ## Phase 1 — Auth & roles (with RLS)
 - [ ] Email/password auth (sign up, log in, log out, sessions) via Supabase Auth

@@ -1,0 +1,29 @@
+name: supabase-keepalive
+
+# Pings the deployed /api/health route, which runs a real DB query so Supabase's
+# free-tier inactivity timer (~7 days) is reset. Runs twice a week to absorb
+# GitHub's best-effort cron delays. The keepalive-workflow step prevents GitHub
+# from auto-disabling this schedule after 60 days of repo inactivity.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1,4" # Mon & Thu 07:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # required for the keepalive commit
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ping health endpoint (runs a DB query)
+        run: |
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://job-hiring-platform-eight.vercel.app/api/health"
+
+      - name: Keep this scheduled workflow enabled
+        uses: gautamkrishnar/keepalive-workflow@v2
