@@ -1,7 +1,8 @@
 # Project Progress
 
-**Current phase:** Phase 0
+**Current phase:** Phase 0 ✅ complete → Phase 1 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
+**Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
 
 ## Phase 0 — Project setup & foundations
@@ -10,10 +11,10 @@
 - [x] Wire up `@supabase/ssr` (server + client helpers)
 - [x] Create profiles, jobs, applications tables (SQL migration)
 - [x] Create the private `resumes` storage bucket
-- [ ] Add ANTHROPIC_API_KEY, Inngest keys, Resend key to env  <!-- placeholders in .env.example/.env.local; real values added in their phases (Anthropic/Resend = user-provided; Inngest = Vercel integration) -->
+- [x] Add ANTHROPIC_API_KEY, Inngest keys, Resend key to env  <!-- env vars declared in .env.example + .env.local; real values filled in their phases (Anthropic→P4, Resend→P6, Inngest→Vercel integration P4) -->
 - [x] Add a /api/health route that runs a trivial DB query
 - [x] Deploy a "hello world" to Vercel; confirm Supabase connectivity in prod
-- [ ] Add a GitHub Actions cron (every few days) that curls /api/health to keep the free-tier Supabase project from pausing  <!-- workflow written; awaiting GitHub repo to push + verify -->
+- [x] Add a GitHub Actions cron (every few days) that curls /api/health to keep the free-tier Supabase project from pausing  <!-- run verified green: ping returned {ok:true,db:up} -->
 - [x] App layout/shell
 
 ## Phase 1 — Auth & roles (with RLS)
