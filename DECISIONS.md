@@ -30,3 +30,6 @@ One line per decision, with the reason. Newest at the bottom.
 - 2026-06-09 - **Resume model: profile default + per-application snapshot** - applicant uploads one CV to their profile (the default); clicking Apply with no CV shows an "upload first" modal, and the upload becomes the default; on apply the file is snapshotted to resumes/{jobId}/{applicationId}.ext so past applications keep the exact file submitted (implemented Phase 3).
 - 2026-06-09 - **AI screening is advisory, never auto-reject** - the worker produces score + Strong/Moderate/Weak + reasoning and moves the candidate to SCREENED; the employer makes the final accept/reject (honors the non-negotiable human-in-the-loop principle; implemented Phase 4/5).
 - 2026-06-09 - **Job expiry: employer-set `expires_at`, default 30 days** - expired jobs are hidden from the public board and search, applying is blocked (enforced in the applications INSERT policy), and they appear under an "Expired" section on the employer dashboard (reopen lets the employer set a new date).
+
+## Theme
+- 2026-06-09 - **Theme: "Playful Pop"** chosen from 10 mockups - warm cream background (#fffaf3), violet primary (#9b5de5), fully rounded chunky buttons with a hard drop shadow, rounded borders, and the Nunito rounded font. Applied globally via tokens + component classes in globals.css; the /themes preview was removed.

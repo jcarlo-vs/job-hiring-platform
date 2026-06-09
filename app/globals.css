@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
+/* Playful Pop theme */
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --primary: #2563eb;
+  --background: #fffaf3;
+  --foreground: #2b2440;
+  --muted: #5b5470;
+  --border: #ece7f5;
+  --primary: #9b5de5;
   --primary-foreground: #ffffff;
 }
 
@@ -16,39 +17,36 @@
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #9ca3af;
-    --border: #1f2937;
-  }
+  --font-sans: var(--font-app-sans);
+  /* rounder corners for the playful feel */
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-app-sans), ui-rounded, "Segoe UI", system-ui, sans-serif;
 }
 
 @layer components {
   .field-label {
-    @apply mb-1 block text-sm font-medium;
+    @apply mb-1 block text-sm font-semibold;
   }
   .field-input {
-    @apply border-border bg-background focus:border-primary w-full rounded-md border px-3 py-2 text-sm outline-none;
+    @apply border-border focus:border-primary w-full rounded-xl border-2 bg-white px-3 py-2 text-sm outline-none;
   }
   .btn-primary {
-    @apply bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60;
+    @apply text-primary-foreground bg-primary rounded-full px-5 py-2.5 text-sm font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60;
+    box-shadow: 0 4px 0 #6f3fb0;
   }
   .form-error {
-    @apply rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700;
+    @apply rounded-xl border-2 border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700;
   }
   .form-note {
-    @apply rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800;
+    @apply rounded-xl border-2 border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800;
   }
 }

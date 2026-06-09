@@ -1,6 +1,6 @@
 # Project Progress
 
-**Current phase:** Phase 3 ✅ complete → (pick a theme) → Phase 4 (not started)
+**Current phase:** Phase 3 ✅ complete → theme applied (Playful Pop) → Phase 4 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
