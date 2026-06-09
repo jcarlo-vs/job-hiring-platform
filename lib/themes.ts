@@ -21,9 +21,97 @@ export type Theme = {
   radius: number;
   borderWidth: number;
   shadow: string;
+  buttonRadius?: number;
+  accentGradient?: string;
 };
 
 export const THEMES: Theme[] = [
+  {
+    slug: "apple",
+    name: "Apple Minimal",
+    tagline:
+      "Generous whitespace, large type, calm grays, pill buttons. Premium and effortless.",
+    vars: {
+      bg: "#ffffff",
+      surface: "#ffffff",
+      text: "#1d1d1f",
+      muted: "#6e6e73",
+      border: "#d2d2d7",
+      primary: "#0071e3",
+      primaryText: "#ffffff",
+      accentSoft: "#f5f5f7",
+    },
+    headingFont: SANS,
+    bodyFont: SANS,
+    radius: 18,
+    borderWidth: 1,
+    shadow: "0 1px 3px rgba(0,0,0,0.06)",
+    buttonRadius: 980,
+  },
+  {
+    slug: "linear",
+    name: "Linear Dark",
+    tagline:
+      "Refined dark UI, violet accent, crisp geometric type. Engineer-crafted feel.",
+    vars: {
+      bg: "#08090d",
+      surface: "#131419",
+      text: "#e6e6ea",
+      muted: "#8a8f98",
+      border: "#23252d",
+      primary: "#5e6ad2",
+      primaryText: "#ffffff",
+      accentSoft: "#1a1c25",
+    },
+    headingFont: SANS,
+    bodyFont: SANS,
+    radius: 8,
+    borderWidth: 1,
+    shadow: "0 1px 2px rgba(0,0,0,0.4), 0 10px 28px rgba(0,0,0,0.35)",
+  },
+  {
+    slug: "stripe",
+    name: "Stripe Clean",
+    tagline:
+      "Crisp light UI, navy text, vivid gradient accent. Polished and professional.",
+    vars: {
+      bg: "#ffffff",
+      surface: "#ffffff",
+      text: "#0a2540",
+      muted: "#425466",
+      border: "#e6ebf1",
+      primary: "#635bff",
+      primaryText: "#ffffff",
+      accentSoft: "#f6f9fc",
+    },
+    headingFont: SANS,
+    bodyFont: SANS,
+    radius: 10,
+    borderWidth: 1,
+    shadow: "0 2px 5px rgba(50,50,93,0.1), 0 1px 2px rgba(0,0,0,0.06)",
+    accentGradient: "linear-gradient(135deg, #635bff 0%, #9d6bff 100%)",
+  },
+  {
+    slug: "vercel",
+    name: "Vercel Mono",
+    tagline:
+      "Stark black on white, high contrast, geometric and minimal. Pure infra aesthetic.",
+    vars: {
+      bg: "#ffffff",
+      surface: "#ffffff",
+      text: "#000000",
+      muted: "#666666",
+      border: "#eaeaea",
+      primary: "#000000",
+      primaryText: "#ffffff",
+      accentSoft: "#fafafa",
+    },
+    headingFont: SANS,
+    bodyFont: SANS,
+    radius: 8,
+    borderWidth: 1,
+    shadow: "0 2px 4px rgba(0,0,0,0.06)",
+  },
   {
     slug: "indigo",
     name: "Indigo Professional",

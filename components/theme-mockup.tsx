@@ -15,10 +15,10 @@ export function ThemeMockup({ theme }: { theme: Theme }) {
     fontSize: 12,
   };
   const primaryBtn: React.CSSProperties = {
-    background: v.primary,
+    background: theme.accentGradient ?? v.primary,
     color: v.primaryText,
     border: brutal ? `${theme.borderWidth}px solid ${v.border}` : "none",
-    borderRadius: theme.radius,
+    borderRadius: theme.buttonRadius ?? theme.radius,
     boxShadow: brutal ? `3px 3px 0 ${v.border}` : "none",
     padding: "8px 14px",
     fontSize: 14,
