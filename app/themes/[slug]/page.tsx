@@ -1,7 +1,19 @@
 import Link from "next/link";
 
-import { ThemeMockup } from "@/components/theme-mockup";
-import { THEMES, getTheme } from "@/lib/themes";
+import { MockApple } from "@/components/mocks/mock-apple";
+import { MockLinear } from "@/components/mocks/mock-linear";
+import { MockNeobrutalism } from "@/components/mocks/mock-neobrutalism";
+import { MockStripe } from "@/components/mocks/mock-stripe";
+import { MockVercel } from "@/components/mocks/mock-vercel";
+import { THEMES } from "@/lib/themes";
+
+const MOCKS: Record<string, React.ComponentType> = {
+  neobrutalism: MockNeobrutalism,
+  apple: MockApple,
+  linear: MockLinear,
+  stripe: MockStripe,
+  vercel: MockVercel,
+};
 
 export default async function ThemePreviewPage({
   params,
@@ -9,9 +21,9 @@ export default async function ThemePreviewPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const theme = getTheme(slug);
+  const Mock = MOCKS[slug];
 
-  if (!theme) {
+  if (!Mock) {
     return (
       <div className="mx-auto max-w-3xl px-6 py-20 text-center">
         <h1 className="text-xl font-semibold">Theme not found</h1>
@@ -43,7 +55,7 @@ export default async function ThemePreviewPage({
           </Link>
         ))}
       </div>
-      <ThemeMockup theme={theme} />
+      <Mock />
     </div>
   );
 }
