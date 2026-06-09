@@ -57,7 +57,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isProtected =
     PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`)) ||
-    /^\/jobs\/[^/]+\/edit$/.test(path);
+    /^\/jobs\/[^/]+\/(edit|applicants)(\/.*)?$/.test(path);
   const isAuthPage = path === "/login" || path === "/signup";
 
   if (!user && isProtected) {

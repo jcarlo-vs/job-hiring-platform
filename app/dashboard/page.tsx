@@ -3,9 +3,16 @@ import { redirect } from "next/navigation";
 
 import { closeJob, reopenJob } from "@/app/jobs/actions";
 import { ResumeManager } from "@/components/resume-manager";
+import {
+  PIPELINE_STAGES,
+  STAGE_LABELS,
+  type ApplicationStage,
+} from "@/lib/applications";
 import { getProfile } from "@/lib/auth";
 import { formatDate, isExpired, type Job } from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
+
+type StageCounts = { total: number; byStage: Partial<Record<ApplicationStage, number>> };
 
 export default async function DashboardPage() {
   const profile = await getProfile();
@@ -25,6 +32,23 @@ export default async function DashboardPage() {
     const active = all.filter((j) => j.status === "OPEN" && !isExpired(j));
     const expired = all.filter((j) => j.status === "OPEN" && isExpired(j));
     const closed = all.filter((j) => j.status === "CLOSED");
+
+    // Applicant counts per stage, per job (RLS lets an employer read
+    // applications for jobs they own). Aggregated in-memory at portfolio volume.
+    const jobIds = all.map((j) => j.id);
+    const { data: apps } = jobIds.length
+      ? await supabase
+          .from("applications")
+          .select("job_id, stage")
+          .in("job_id", jobIds)
+      : { data: [] };
+    const countsByJob = new Map<string, StageCounts>();
+    for (const a of apps ?? []) {
+      const c = countsByJob.get(a.job_id) ?? { total: 0, byStage: {} };
+      c.total += 1;
+      c.byStage[a.stage] = (c.byStage[a.stage] ?? 0) + 1;
+      countsByJob.set(a.job_id, c);
+    }
 
     return (
       <div className="mx-auto max-w-5xl px-6 py-12">
@@ -49,13 +73,22 @@ export default async function DashboardPage() {
             <Section
               title={`Active (${active.length})`}
               jobs={active}
+              counts={countsByJob}
               empty="No active postings."
             />
             {expired.length > 0 && (
-              <Section title={`Expired (${expired.length})`} jobs={expired} />
+              <Section
+                title={`Expired (${expired.length})`}
+                jobs={expired}
+                counts={countsByJob}
+              />
             )}
             {closed.length > 0 && (
-              <Section title={`Closed (${closed.length})`} jobs={closed} />
+              <Section
+                title={`Closed (${closed.length})`}
+                jobs={closed}
+                counts={countsByJob}
+              />
             )}
           </div>
         )}
@@ -100,10 +133,12 @@ export default async function DashboardPage() {
 function Section({
   title,
   jobs,
+  counts,
   empty,
 }: {
   title: string;
   jobs: Job[];
+  counts: Map<string, StageCounts>;
   empty?: string;
 }) {
   return (
@@ -116,7 +151,7 @@ function Section({
       ) : (
         <ul className="mt-3 space-y-3">
           {jobs.map((job) => (
-            <JobManageRow key={job.id} job={job} />
+            <JobManageRow key={job.id} job={job} counts={counts.get(job.id)} />
           ))}
         </ul>
       )}
@@ -124,11 +159,12 @@ function Section({
   );
 }
 
-function JobManageRow({ job }: { job: Job }) {
+function JobManageRow({ job, counts }: { job: Job; counts?: StageCounts }) {
   const expired = isExpired(job);
+  const total = counts?.total ?? 0;
   return (
     <li className="border-border flex flex-wrap items-center justify-between gap-3 rounded-md border p-4">
-      <div>
+      <div className="min-w-0">
         <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
           {job.title}
         </Link>
@@ -138,8 +174,28 @@ function JobManageRow({ job }: { job: Job }) {
             ? ` - ${expired ? "expired" : "expires"} ${formatDate(job.expires_at)}`
             : ""}
         </p>
+        {total > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {PIPELINE_STAGES.filter((s) => counts?.byStage[s]).map((s) => (
+              <span
+                key={s}
+                className="border-border rounded-full border px-2 py-0.5 text-xs"
+              >
+                {counts?.byStage[s]} {STAGE_LABELS[s]}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted mt-2 text-xs">No applicants yet</p>
+        )}
       </div>
       <div className="text-muted flex items-center gap-3 text-sm">
+        <Link
+          href={`/jobs/${job.id}/applicants`}
+          className="text-primary font-semibold hover:underline"
+        >
+          {total > 0 ? `Applicants (${total})` : "Applicants"}
+        </Link>
         <Link
           href={`/jobs/${job.id}/edit`}
           className="text-primary hover:underline"

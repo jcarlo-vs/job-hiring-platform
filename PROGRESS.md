@@ -1,9 +1,9 @@
 # Project Progress
 
-**Current phase:** Phase 3 ✅ complete → theme applied (Playful Pop) → Phase 4 (not started)
+**Current phase:** Phase 5 ✅ complete (verified end-to-end) → Phase 6 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 
 ## Phase 0 - Project setup & foundations
 - [x] Initialize Next.js + TypeScript + Tailwind; set up ESLint/Prettier
@@ -43,24 +43,29 @@
 - [x] (verified) signed-URL upload, apply+snapshot, RLS isolation via Node script using real client libs
 
 ## Phase 4 - AI screening pipeline (centerpiece)
-- [ ] Set up Inngest and a screening function
-- [ ] On apply, enqueue a screening job with the application_id
-- [ ] Worker: download resume from Supabase Storage → extract text (pdf-parse / mammoth)
-- [ ] Worker: call Claude with job requirements + resume text; request JSON per the contract
-- [ ] Parse + validate JSON; persist ai_score, ai_recommendation, ai_summary, ai_matched, ai_missing, ai_flags
-- [ ] Set screening_status to DONE (or ERROR) and stage to SCREENED on success
-- [ ] Idempotency: guard so a re-run doesn't double-process (check screening_status)
-- [ ] Retries with backoff + a clear ERROR state surfaced in the UI
-- [ ] Secure the trigger (shared secret / signature) so outsiders can't invoke the worker
-- [ ] Manual "re-screen" action for an employer
+- [x] Set up Inngest and a screening function  <!-- Inngest v4: lib/inngest/client.ts (client + typed `application/submitted` event via eventType/staticSchema), lib/inngest/functions.ts (screenApplication), served at app/api/inngest/route.ts -->
+- [x] On apply, enqueue a screening job with the application_id  <!-- applyToJob sends application/submitted after the resume snapshot; best-effort (a queue outage must not fail the apply) -->
+- [x] Worker: download resume from Supabase Storage → extract text (unpdf / mammoth)  <!-- lib/resume-extract.ts; service-role download; verified live on a real PDF -->
+- [x] Worker: call Claude with job requirements + resume text; request JSON per the contract  <!-- lib/screening.ts; claude-haiku-4-5; structured output via output_config.format JSON schema -->
+- [x] Parse + validate JSON; persist ai_score, ai_recommendation, ai_summary, ai_matched, ai_missing, ai_flags  <!-- defensive parse + score clamp 0-100; verified persisted end-to-end -->
+- [x] Set screening_status to DONE (or ERROR) and stage to SCREENED on success  <!-- DONE on success; onFailure → ERROR; stage advances APPLIED → SCREENED only (never pulls a candidate back) -->
+- [x] Idempotency: guard so a re-run doesn't double-process (check screening_status)  <!-- atomic DB claim PENDING|ERROR → PROCESSING; verified live: re-sending the event skipped, updated_at unchanged -->
+- [x] Retries with backoff + a clear ERROR state surfaced in the UI  <!-- Inngest retries:3 (exponential backoff); ERROR shows on /applications via SCREENING_LABELS; employer-side surfacing lands in Phase 5 -->
+- [x] Secure the trigger (shared secret / signature) so outsiders can't invoke the worker  <!-- Inngest request signing (INNGEST_SIGNING_KEY) in prod; /api/inngest is not a protected proxy prefix -->
+- [x] Manual "re-screen" action for an employer  <!-- rescreenApplication server action (ownership-checked, resets to PENDING, re-enqueues); employer UI to call it lands in Phase 5 -->
+- Verified end-to-end on 2026-06-10 via the real UI flow: apply → PDF extracted → Claude scored (25/WEAK, calibrated) → persisted DONE/SCREENED; idempotent re-send skipped cleanly.
+- Deploy TODO (prod): set ANTHROPIC_API_KEY in Vercel + add the Inngest Vercel integration (injects INNGEST_EVENT_KEY + INNGEST_SIGNING_KEY).
 
 ## Phase 5 - Employer dashboard & hiring pipeline
-- [ ] Dashboard listing the employer's jobs, each with applicant counts per stage
-- [ ] Per-job applicant view: table with AI score + recommendation, sortable (recommended first), filterable by stage
-- [ ] Candidate detail: resume preview via signed download URL + AI summary, matched/missing requirements, flags
-- [ ] Move a candidate between stages (Applied → Screened → Tech Interview → Final → Offer/Rejected)
-- [ ] Drag-and-drop pipeline board (Kanban-style) operating on stage
-- [ ] RLS + server-side checks on every stage change and resume download
+- [x] Dashboard listing the employer's jobs, each with applicant counts per stage  <!-- dashboard shows per-stage count pills + "Applicants (N)" link per job -->
+- [x] Per-job applicant view: table with AI score + recommendation, sortable (recommended first), filterable by stage  <!-- /jobs/[id]/applicants; ApplicantsView (client) sorts recommended/score/recent, filters by stage -->
+- [x] Candidate detail: resume preview via signed download URL + AI summary, matched/missing requirements, flags  <!-- /jobs/[id]/applicants/[applicationId]; PDF in iframe, other types via "open in new tab"; advisory-only note -->
+- [x] Move a candidate between stages (Applied → Screened → Tech Interview → Final → Offer/Rejected)  <!-- inline <select> in table + detail; updateApplicationStage action -->
+- [x] Drag-and-drop pipeline board (Kanban-style) operating on stage  <!-- @dnd-kit/core; Table/Board toggle; optimistic moves shared with the table; keyboard-accessible -->
+- [x] Manual employer re-screen surfaced  <!-- re-screen button on candidate detail (rescreenApplication); ERROR screening state shown -->
+- [x] RLS + server-side checks on every stage change and resume download  <!-- stage updates run under the employer session (applications_update_employer / owns_job); pages re-check job ownership; resume signed URLs issued by service role only after ownership check -->
+- Verified end-to-end 2026-06-10: typecheck + lint + `next build` clean; unauthenticated /jobs/[id]/applicants[/...] redirect (307) via proxy; employer browsed applicants, sorted/filtered, moved stages, dragged on the board, previewed the resume, and re-screened - all confirmed in the browser.
+- No new migration needed - Phase 1 RLS (applications_select/update via private.owns_job, resumes_select for employers) already covers it.
 
 ## Phase 6 - Notifications & polish
 - [ ] Transactional emails (Resend): application received + stage-change notifications
