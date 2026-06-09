@@ -7,7 +7,7 @@ import type { Database } from "@/lib/database.types";
  * Supabase client for Server Components, Server Actions, and Route Handlers.
  *
  * `cookies()` is async in Next 15+, so this helper is async. Always authorize
- * with `supabase.auth.getUser()` (verified against the Auth server) — never
+ * with `supabase.auth.getUser()` (verified against the Auth server) - never
  * `getSession()`, which reads spoofable, unrevalidated cookie data.
  */
 export async function createClient() {

@@ -1,7 +1,7 @@
 const features = [
   {
     title: "Explainable screening",
-    body: "Every applicant gets an AI match score with the reasoning behind it — matched and missing requirements, and any flags — all persisted and auditable.",
+    body: "Every applicant gets an AI match score with the reasoning behind it - matched and missing requirements, and any flags - all persisted and auditable.",
   },
   {
     title: "Human-in-the-loop",
@@ -9,7 +9,7 @@ const features = [
   },
   {
     title: "A real pipeline",
-    body: "Track candidates from Applied through Screened, interviews, and offers on a drag-and-drop board — with screening running safely in the background.",
+    body: "Track candidates from Applied through Screened, interviews, and offers on a drag-and-drop board - with screening running safely in the background.",
   },
 ];
 
@@ -21,7 +21,7 @@ export default function Home() {
           AI-assisted resume screening
         </p>
         <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Screen candidates faster — without letting the AI decide.
+          Screen candidates faster - without letting the AI decide.
         </h1>
         <p className="text-muted mt-5 max-w-2xl text-lg">
           Employers post roles and review applicants ranked by an explainable AI

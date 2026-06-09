@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 
-// Never cache — the keep-alive depends on this handler executing a real query.
+// Never cache - the keep-alive depends on this handler executing a real query.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
-  // Trivial query that actually hits Postgres — this is what resets
+  // Trivial query that actually hits Postgres - this is what resets
   // Supabase's free-tier inactivity-pause timer (a static 200 would not).
   const { error } = await supabase
     .from("health_check")

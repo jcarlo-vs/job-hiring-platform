@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TalentScreen — AI-assisted hiring",
+  title: "TalentScreen - AI-assisted hiring",
   description:
-    "Post jobs, collect applications, and get explainable AI resume screening that supports hiring managers — the human always makes the final call.",
+    "Post jobs, collect applications, and get explainable AI resume screening that supports hiring managers - the human always makes the final call.",
 };
 
 export default function RootLayout({
@@ -36,7 +36,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <footer className="border-border text-muted border-t">
           <div className="mx-auto max-w-5xl px-6 py-8 text-sm">
-            Built with Next.js, Supabase, Inngest, and Claude — a portfolio
+            Built with Next.js, Supabase, Inngest, and Claude - a portfolio
             project.
           </div>
         </footer>

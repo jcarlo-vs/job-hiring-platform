@@ -1,11 +1,11 @@
 # Project Progress
 
-**Current phase:** Phase 1 (in progress)
+**Current phase:** Phase 1 ✅ complete → Phase 2 (not started)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-09
 
-## Phase 0 — Project setup & foundations
+## Phase 0 - Project setup & foundations
 - [x] Initialize Next.js + TypeScript + Tailwind; set up ESLint/Prettier
 - [x] Create a Supabase project; add URL + keys to env (.env and .env.example)
 - [x] Wire up `@supabase/ssr` (server + client helpers)
@@ -17,15 +17,15 @@
 - [x] Add a GitHub Actions cron (every few days) that curls /api/health to keep the free-tier Supabase project from pausing  <!-- run verified green: ping returned {ok:true,db:up} -->
 - [x] App layout/shell
 
-## Phase 1 — Auth & roles (with RLS)
-- [ ] Email/password auth (sign up, log in, log out, sessions) via Supabase Auth  <!-- UI + server actions built; end-to-end prod verify pending the email-confirmation toggle -->
+## Phase 1 - Auth & roles (with RLS)
+- [x] Email/password auth (sign up, log in, log out, sessions) via Supabase Auth  <!-- verified end-to-end on prod Auth: signup returns a session (confirmation off), password login returns a token -->
 - [x] On signup, create a profiles row with chosen role (Applicant vs Employer)  <!-- handle_new_user trigger verified: profiles auto-created with correct roles -->
 - [x] Protected routes / middleware; redirect unauthenticated users  <!-- verified: /dashboard -> /login?next=, auth-page skip -->
-- [ ] Role-based landing (applicant home vs employer dashboard)  <!-- /dashboard branches by role; prod login verify pending toggle -->
-- [x] Write and test RLS policies for profiles, jobs, applications, and the resumes bucket  <!-- verified via role impersonation: read isolation + WITH CHECK write enforcement; advisors clean -->
+- [x] Role-based landing (applicant home vs employer dashboard)  <!-- /dashboard branches on the (verified) profile role read -->
+- [x] Write and test RLS policies for profiles, jobs, applications, and the resumes bucket  <!-- verified via role impersonation + real GoTrue tokens: read isolation + WITH CHECK write enforcement; advisors clean -->
 
 
-## Phase 2 — Jobs (employer create/manage) + public browse
+## Phase 2 - Jobs (employer create/manage) + public browse
 - [ ] Employer: create job (title, description, requirements, location, salary, type, work mode)
 - [ ] Employer: edit, close/reopen, list own jobs
 - [ ] Public: browse all OPEN jobs (card list) + single job detail page
@@ -33,14 +33,14 @@
 - [ ] Pagination (or infinite scroll)
 - [ ] Empty/loading/error states
 
-## Phase 3 — Applications (applicant side)
+## Phase 3 - Applications (applicant side)
 - [ ] Resume upload to the resumes bucket via signed upload URL; validate type (PDF/DOCX) and size
 - [ ] Apply to a job → create applications row (stage APPLIED, screening_status PENDING)
 - [ ] Enforce one application per job per applicant
 - [ ] "My applications" page: job title, date, current stage, screening status
-- [ ] Confirmation UI ("Application received — screening in progress")
+- [ ] Confirmation UI ("Application received - screening in progress")
 
-## Phase 4 — AI screening pipeline (centerpiece)
+## Phase 4 - AI screening pipeline (centerpiece)
 - [ ] Set up Inngest and a screening function
 - [ ] On apply, enqueue a screening job with the application_id
 - [ ] Worker: download resume from Supabase Storage → extract text (pdf-parse / mammoth)
@@ -52,7 +52,7 @@
 - [ ] Secure the trigger (shared secret / signature) so outsiders can't invoke the worker
 - [ ] Manual "re-screen" action for an employer
 
-## Phase 5 — Employer dashboard & hiring pipeline
+## Phase 5 - Employer dashboard & hiring pipeline
 - [ ] Dashboard listing the employer's jobs, each with applicant counts per stage
 - [ ] Per-job applicant view: table with AI score + recommendation, sortable (recommended first), filterable by stage
 - [ ] Candidate detail: resume preview via signed download URL + AI summary, matched/missing requirements, flags
@@ -60,14 +60,14 @@
 - [ ] Drag-and-drop pipeline board (Kanban-style) operating on stage
 - [ ] RLS + server-side checks on every stage change and resume download
 
-## Phase 6 — Notifications & polish
+## Phase 6 - Notifications & polish
 - [ ] Transactional emails (Resend): application received + stage-change notifications
 - [ ] Consistent empty/loading/error states across the app
 - [ ] Responsive layout + basic accessibility pass (labels, focus, contrast)
 - [ ] Landing page explaining the product
 - [ ] README.md: architecture diagram, screenshots, live link, setup steps, and a note on the human-in-the-loop / responsible-AI design decision
 
-## Phase 7 — Stretch (optional, pick 1-2)
+## Phase 7 - Stretch (optional, pick 1-2)
 - [ ] Auto re-screen all applicants when a job's requirements change
 - [ ] Employer analytics: funnel/conversion per job
 - [ ] Applicant: saved searches + email job alerts
