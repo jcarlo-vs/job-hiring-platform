@@ -8,11 +8,12 @@ import {
   STAGE_LABELS,
 } from "@/lib/applications";
 import { getUser } from "@/lib/auth";
-import { RESUME_BUCKET, resumeExtension } from "@/lib/resume";
+import { resumeExtension } from "@/lib/resume";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 import { CandidateActions } from "./candidate-actions";
+import { ResumeViewer } from "./resume-viewer";
 
 /** Read a jsonb column that holds a string array, defensively. */
 function asList(value: unknown): string[] {
@@ -61,15 +62,11 @@ export default async function CandidatePage({
     .single();
   const name = profile?.full_name || "Candidate";
 
-  let resumeUrl: string | null = null;
-  let resumeExt = "";
-  if (app.resume_path) {
-    resumeExt = resumeExtension(app.resume_path);
-    const { data: signed } = await admin.storage
-      .from(RESUME_BUCKET)
-      .createSignedUrl(app.resume_path, 300);
-    resumeUrl = signed?.signedUrl ?? null;
-  }
+  // Served same-origin via the resume route (reliable embedding + the modal).
+  const isPdf = app.resume_path
+    ? resumeExtension(app.resume_path) === "pdf"
+    : false;
+  const resumeSrc = app.resume_path ? `/api/resume/${app.id}` : null;
 
   const matched = asList(app.ai_matched);
   const missing = asList(app.ai_missing);
@@ -175,33 +172,8 @@ export default async function CandidatePage({
 
         {/* Right: resume */}
         <section className="border-border rounded-2xl border-2 bg-white p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Resume</h2>
-            {resumeUrl && (
-              <a
-                href={resumeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary text-sm font-semibold hover:underline"
-              >
-                Open in new tab
-              </a>
-            )}
-          </div>
-          {!resumeUrl ? (
-            <p className="text-muted mt-4 text-sm">No resume on file.</p>
-          ) : resumeExt === "pdf" ? (
-            <iframe
-              src={resumeUrl}
-              title={`Resume - ${name}`}
-              className="border-border mt-4 h-[640px] w-full rounded-xl border-2"
-            />
-          ) : (
-            <p className="text-muted mt-4 text-sm">
-              This resume is a {resumeExt.toUpperCase()} file. Use &ldquo;Open in
-              new tab&rdquo; to download and view it.
-            </p>
-          )}
+          <h2 className="font-semibold">Resume</h2>
+          <ResumeViewer src={resumeSrc} isPdf={isPdf} name={name} />
         </section>
       </div>
     </div>
