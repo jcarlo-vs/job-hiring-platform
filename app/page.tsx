@@ -60,12 +60,12 @@ export default async function Home() {
           AI-assisted resume screening
         </p>
         <h1 className="mt-3 max-w-2xl text-4xl font-extrabold tracking-tight text-balance sm:text-5xl">
-          Screen candidates faster - without letting the AI decide.
+          Screen resumes in seconds - you make the final call.
         </h1>
         <p className="text-muted mt-5 max-w-2xl text-lg">
           Employers post roles and review applicants ranked by an explainable AI
           match score. Every recommendation comes with its reasoning, and a
-          human always makes the final call.
+          human always makes the decision.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href={ctas.primary.href} className="btn-primary">
