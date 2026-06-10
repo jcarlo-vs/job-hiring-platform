@@ -146,27 +146,61 @@ export function JobsMasterDetail({
   );
 }
 
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0"
+    >
+      <path
+        d={dir === "left" ? "M12 5l-5 5 5 5" : "M8 5l5 5-5 5"}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function PaginationRow({ page, totalPages, prevHref, nextHref }: Pagination) {
   if (totalPages <= 1) return null;
+  const base =
+    "inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-bold transition-colors";
+  const enabled = "border-border hover:border-primary bg-white";
+  const disabled = "border-border text-muted cursor-not-allowed opacity-50";
   return (
-    <div className="text-muted mt-6 flex items-center justify-between text-sm">
+    <nav
+      aria-label="Pagination"
+      className="mt-6 flex items-center justify-between gap-3"
+    >
       {prevHref ? (
-        <Link href={prevHref} className="hover:text-foreground">
-          &larr; Previous
+        <Link href={prevHref} className={`${base} ${enabled}`}>
+          <Chevron dir="left" />
+          Previous
         </Link>
       ) : (
-        <span className="opacity-40">&larr; Previous</span>
+        <span aria-disabled="true" className={`${base} ${disabled}`}>
+          <Chevron dir="left" />
+          Previous
+        </span>
       )}
-      <span>
-        Page {page} of {totalPages}
+      <span className="text-muted text-sm font-semibold">
+        Page <span className="text-foreground">{page}</span> of {totalPages}
       </span>
       {nextHref ? (
-        <Link href={nextHref} className="hover:text-foreground">
-          Next &rarr;
+        <Link href={nextHref} className={`${base} ${enabled}`}>
+          Next
+          <Chevron dir="right" />
         </Link>
       ) : (
-        <span className="opacity-40">Next &rarr;</span>
+        <span aria-disabled="true" className={`${base} ${disabled}`}>
+          Next
+          <Chevron dir="right" />
+        </span>
       )}
-    </div>
+    </nav>
   );
 }
