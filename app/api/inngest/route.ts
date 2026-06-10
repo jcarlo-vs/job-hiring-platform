@@ -1,6 +1,10 @@
 import { serve } from "inngest/next";
 
 import { inngest } from "@/lib/inngest/client";
+import {
+  sendApplicationReceived,
+  sendStageChange,
+} from "@/lib/inngest/email-functions";
 import { screenApplication } from "@/lib/inngest/functions";
 
 // Node runtime (the default for route handlers): the worker uses unpdf, mammoth,
@@ -14,5 +18,5 @@ export const maxDuration = 60;
 // auth proxy leaves /api/inngest untouched (it is not a protected prefix).
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [screenApplication],
+  functions: [screenApplication, sendApplicationReceived, sendStageChange],
 });

@@ -1,6 +1,6 @@
 # Project Progress
 
-**Current phase:** Phase 5 ✅ complete (verified end-to-end) → Phase 6 (not started)
+**Current phase:** Phase 6 implemented (typecheck/lint/build clean) → email real-send pending a Resend key → Phase 7 (stretch, optional)
 **Live URL:** https://job-hiring-platform-eight.vercel.app
 **Repo:** https://github.com/jcarlo-vs/job-hiring-platform
 **Last updated:** 2026-06-10
@@ -68,11 +68,12 @@
 - No new migration needed - Phase 1 RLS (applications_select/update via private.owns_job, resumes_select for employers) already covers it.
 
 ## Phase 6 - Notifications & polish
-- [ ] Transactional emails (Resend): application received + stage-change notifications
-- [ ] Consistent empty/loading/error states across the app
-- [ ] Responsive layout + basic accessibility pass (labels, focus, contrast)
-- [ ] Landing page explaining the product
-- [ ] README.md: architecture diagram, screenshots, live link, setup steps, and a note on the human-in-the-loop / responsible-AI design decision
+- [x] Transactional emails (Resend): application received + stage-change notifications  <!-- lib/email.ts (branded templates) + Inngest fns send-application-received (on application/submitted) and send-stage-change (on new application/stage-changed, emitted by updateApplicationStage; NOT on auto APPLIED->SCREENED). Registered + no-op without RESEND_API_KEY. Real send pending a key. -->
+- [x] Consistent empty/loading/error states across the app  <!-- added root app/error.tsx catch-all; loading skeletons for /dashboard and /jobs/[id]/applicants subtree; empty states already present elsewhere -->
+- [x] Responsive layout + basic accessibility pass (labels, focus, contrast)  <!-- focus-visible ring in @layer base for buttons/links/draggable cards; forms already have label+htmlFor; header/main/footer + html lang=en; responsive via mobile-first Tailwind -->
+- [x] Landing page explaining the product  <!-- app/page.tsx: role-aware CTAs (guest/employer/applicant), How-it-works, value props, Playful Pop styling -->
+- [x] README.md: architecture diagram, live link, setup steps, responsible-AI note  <!-- mermaid screening pipeline, env table, setup w/ Inngest dev server. Screenshots: placeholder note for docs/screenshots (user to capture from the live UI). -->
+- Verified: typecheck + lint + `next build` clean; landing renders. Both email functions proven firing locally end-to-end (triggered application/submitted + application/stage-changed; each resolved the applicant email and rendered the correct subject, then logged "would send ... to <email>"). The only thing gated on a key is the literal Resend API call -> Phase 8. (onboarding@resend.dev only delivers to the Resend-account email until a domain is verified.)
 
 ## Phase 7 - Stretch (optional, pick 1-2)
 - [ ] Auto re-screen all applicants when a job's requirements change
@@ -81,3 +82,13 @@
 - [ ] Realtime updates (Supabase Realtime) so the dashboard updates live as screenings finish
 - [ ] Rate limiting on apply + screening endpoints
 - [ ] Basic evals for the screening prompt (a small fixed set of resume/JD pairs with expected outcomes)
+
+## Phase 8 - Production deployment & go-live (do LAST; all prod + registration work lives here)
+Local dev needs NONE of this. The app runs fully locally - the Inngest dev server needs no account, and screening already works with the local ANTHROPIC_API_KEY. These items only make the live Vercel site fully functional.
+- [ ] Register a free Inngest account; add the Inngest Vercel integration (auto-injects INNGEST_EVENT_KEY + INNGEST_SIGNING_KEY and syncs functions on each deploy)
+- [ ] Add ANTHROPIC_API_KEY to Vercel env (prod screening)
+- [ ] Register Resend; verify a sending domain; set RESEND_API_KEY + RESEND_FROM in Vercel (prod email - note Resend has no local mode, so a key is required to actually send even from localhost)
+- [ ] Set NEXT_PUBLIC_SITE_URL to the live URL (used for links in emails)
+- [ ] Confirm Supabase URL/anon + SUPABASE_SERVICE_ROLE_KEY are set in Vercel env
+- [ ] Deploy (push to main) + prod smoke test: signup -> post job -> apply -> screening runs (Inngest Cloud) -> employer sees the score -> move a stage -> email delivered
+- [ ] (optional) Re-enable Supabase email confirmation now that Resend SMTP is wired (the /auth/confirm route already exists)

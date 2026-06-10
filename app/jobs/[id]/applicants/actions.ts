@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PIPELINE_STAGES, type ApplicationStage } from "@/lib/applications";
+import { applicationStageChanged, inngest } from "@/lib/inngest/client";
 import { createClient } from "@/utils/supabase/server";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -37,6 +38,16 @@ export async function updateApplicationStage(
   if (error) return { ok: false, error: error.message };
   if (!data || data.length === 0) {
     return { ok: false, error: "Not found, or you do not own this job." };
+  }
+
+  // Notify the applicant by email (best-effort; the stage change is committed).
+  try {
+    await inngest.send({
+      name: applicationStageChanged.event,
+      data: { applicationId, stage },
+    });
+  } catch (err) {
+    console.error(`[stage] failed to enqueue stage-change email:`, err);
   }
 
   revalidatePath(`/jobs/${jobId}/applicants`);

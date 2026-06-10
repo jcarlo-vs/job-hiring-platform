@@ -32,6 +32,18 @@ body {
     var(--font-app-sans), ui-rounded, "Segoe UI", system-ui, sans-serif;
 }
 
+@layer base {
+  /* Visible keyboard-focus ring for interactive elements (buttons, links, and
+     dnd-kit draggable cards). Inputs/selects signal focus via border color. */
+  a:focus-visible,
+  button:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
 @layer components {
   .field-label {
     @apply mb-1 block text-sm font-semibold;

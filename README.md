@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TalentScreen
 
-## Getting Started
+**AI-assisted resume screening that keeps a human in the loop.**
 
-First, run the development server:
+A full-stack job board and applicant tracking system. Applicants apply with a resume; an AI screens each one against the job's requirements and produces an explainable match score; employers review candidates ranked by that score and move them through a hiring pipeline. The AI advises - it never decides.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Live demo:** https://job-hiring-platform-eight.vercel.app
+- **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Supabase - Inngest - Claude - Resend
+
+> Portfolio project. Build log in [PROGRESS.md](./PROGRESS.md); the full decision log (with reasons) is in [DECISIONS.md](./DECISIONS.md).
+
+## Responsible AI: human-in-the-loop by design
+
+The screening AI is a **decision-support tool, not the decision-maker** - this is the central design constraint, not an afterthought:
+
+- It produces a 0-100 match score, a STRONG/MODERATE/WEAK recommendation, a short summary, and explicit **matched / missing / flagged** lists - all grounded in the resume and **persisted for auditability**.
+- It **never auto-rejects**. On success it moves a candidate to `SCREENED` and stops; a person makes every accept/reject call by moving them through the pipeline.
+- The prompt instructs the model to **judge only on relevance to the stated requirements** and to ignore name, gender, age, nationality, and other protected characteristics.
+- Output is constrained with **structured outputs** (a JSON schema) and re-validated server-side, so the employer always sees a consistent, explainable result rather than opaque prose.
+
+## Features
+
+- **Auth and roles** (employer vs. applicant) with Postgres Row Level Security as the security boundary.
+- **Employers:** post, edit, close/reopen, and expire jobs.
+- **Applicants:** upload a resume (PDF/DOCX), apply in one click, and track each application's stage + screening status.
+- **AI screening pipeline:** runs in the background on apply - downloads the resume, extracts its text, calls Claude, and persists an explainable score.
+- **Hiring pipeline:** per-job applicant table (sortable recommended-first, filterable by stage), a drag-and-drop Kanban board, and a candidate detail view with an inline resume preview, the AI breakdown, stage controls, and a manual re-screen.
+- **Transactional email** (Resend): application-received and stage-change notifications.
+
+## How the AI screening works
+
+Screening is a background job so the apply request stays fast and the work is retryable and idempotent.
+
+```mermaid
+flowchart LR
+  A[Applicant clicks Apply] --> B[Application row created<br/>resume snapshotted to Storage]
+  B --> C[Emit application/submitted event]
+  C --> D{Inngest worker}
+  D --> E[Claim: PENDING -> PROCESSING<br/>atomic, idempotent]
+  E --> F[Download resume + extract text<br/>unpdf / mammoth]
+  F --> G[Claude Haiku 4.5<br/>structured-output screening]
+  G --> H[Persist score + recommendation<br/>+ matched/missing/flags<br/>DONE, stage -> SCREENED]
+  H --> I[Employer reviews + decides]
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Claim step** does an atomic `PENDING|ERROR -> PROCESSING` update, so a duplicate or retried event can't double-process.
+- **Retries** with backoff are built in; on exhaustion the row is set to `ERROR` and surfaced in the UI.
+- The worker runs on the **Node runtime** with the Supabase **service role** (it bypasses RLS deliberately, behind a signed Inngest endpoint).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Area | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router, React Server Components, Server Actions, Turbopack) |
+| Language / UI | TypeScript, React 19, Tailwind CSS v4 |
+| Data / auth / files | Supabase (Postgres, Auth, Storage) with Row Level Security |
+| Background jobs | Inngest (retries, concurrency, idempotency, dashboard) |
+| AI | Anthropic Claude (`claude-haiku-4-5`) with structured outputs |
+| Resume parsing | `unpdf` (PDF) + `mammoth` (DOCX) |
+| Drag-and-drop | `@dnd-kit/core` |
+| Email | Resend |
+| Hosting | Vercel |
 
-## Learn More
+## Local development
 
-To learn more about Next.js, take a look at the following resources:
+**Prerequisites:** Node 22+ (`.nvmrc` pins 22), and a Supabase project. API keys for Anthropic (and optionally Resend) to exercise screening and email.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# 1. Install
+npm install
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# 2. Configure environment
+cp .env.example .env.local
+# then fill in the values (see the table below)
 
-## Deploy on Vercel
+# 3. Database
+#    Run the SQL files in supabase/migrations/ in order (Supabase SQL editor
+#    or `supabase db push`), which also creates the private `resumes` bucket.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 4. Run the app
+npm run dev                 # http://localhost:3000
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 5. Run the background-jobs dev server (separate terminal) for screening/email
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+```
+
+### Environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase publishable/anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; signed URLs + the screening worker |
+| `ANTHROPIC_API_KEY` | for screening | Claude API key |
+| `INNGEST_DEV` | local | Set to `1` for the local Inngest dev server |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | prod | Injected by the Inngest Vercel integration |
+| `RESEND_API_KEY` | for email | Resend key; emails no-op if unset |
+| `RESEND_FROM` | for email | Verified sender, e.g. `"TalentScreen <you@domain.com>"` |
+| `NEXT_PUBLIC_SITE_URL` | for email links | Public base URL used in email links |
+| `CRON_SECRET` | keep-alive | Gates the `/api/health` keep-alive ping |
+
+> Without `ANTHROPIC_API_KEY` / `RESEND_API_KEY`, the app still runs - the screening and email steps degrade gracefully (screening errors are surfaced; emails are skipped).
+
+## Screenshots
+
+_Add captures to `docs/screenshots/` (landing, employer pipeline board, candidate detail with AI breakdown). The live demo above is the quickest way to see it in action._
+
+## Scripts
+
+```bash
+npm run dev          # dev server (Turbopack)
+npm run build        # production build
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint
+npm run format       # prettier --write
+```
