@@ -113,6 +113,7 @@ export type Database = {
           requirements: string
           salary_max: number | null
           salary_min: number | null
+          salary_period: Database["public"]["Enums"]["salary_period"]
           status: Database["public"]["Enums"]["job_status"]
           title: string
           work_mode: Database["public"]["Enums"]["work_mode"]
@@ -128,6 +129,7 @@ export type Database = {
           requirements: string
           salary_max?: number | null
           salary_min?: number | null
+          salary_period?: Database["public"]["Enums"]["salary_period"]
           status?: Database["public"]["Enums"]["job_status"]
           title: string
           work_mode: Database["public"]["Enums"]["work_mode"]
@@ -143,6 +145,7 @@ export type Database = {
           requirements?: string
           salary_max?: number | null
           salary_min?: number | null
+          salary_period?: Database["public"]["Enums"]["salary_period"]
           status?: Database["public"]["Enums"]["job_status"]
           title?: string
           work_mode?: Database["public"]["Enums"]["work_mode"]
@@ -205,6 +208,7 @@ export type Database = {
         | "REJECTED"
       employment_type: "FULL_TIME" | "PART_TIME" | "CONTRACT"
       job_status: "OPEN" | "CLOSED"
+      salary_period: "HOURLY" | "MONTHLY" | "ANNUAL"
       screening_status: "PENDING" | "PROCESSING" | "DONE" | "ERROR"
       user_role: "APPLICANT" | "EMPLOYER"
       work_mode: "REMOTE" | "ONSITE" | "HYBRID"
@@ -346,6 +350,7 @@ export const Constants = {
       ],
       employment_type: ["FULL_TIME", "PART_TIME", "CONTRACT"],
       job_status: ["OPEN", "CLOSED"],
+      salary_period: ["HOURLY", "MONTHLY", "ANNUAL"],
       screening_status: ["PENDING", "PROCESSING", "DONE", "ERROR"],
       user_role: ["APPLICANT", "EMPLOYER"],
       work_mode: ["REMOTE", "ONSITE", "HYBRID"],

@@ -4,7 +4,11 @@ import { useActionState } from "react";
 
 import type { JobFormState } from "@/app/jobs/actions";
 import { Constants } from "@/lib/database.types";
-import { EMPLOYMENT_TYPE_LABELS, WORK_MODE_LABELS } from "@/lib/jobs";
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  SALARY_PERIOD_LABELS,
+  WORK_MODE_LABELS,
+} from "@/lib/jobs";
 
 type Defaults = {
   title?: string;
@@ -13,6 +17,7 @@ type Defaults = {
   location?: string;
   salaryMin?: string;
   salaryMax?: string;
+  salaryPeriod?: string;
   employmentType?: string;
   workMode?: string;
   expiresAt?: string;
@@ -120,6 +125,27 @@ export function JobForm({
             className="field-input"
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="salaryPeriod" className="field-label">
+          Pay period
+        </label>
+        <select
+          id="salaryPeriod"
+          name="salaryPeriod"
+          defaultValue={defaults.salaryPeriod ?? "ANNUAL"}
+          className="field-input"
+        >
+          {Constants.public.Enums.salary_period.map((p) => (
+            <option key={p} value={p}>
+              {SALARY_PERIOD_LABELS[p]}
+            </option>
+          ))}
+        </select>
+        <p className="text-muted mt-1 text-xs">
+          How the pay above is quoted (e.g. $10/hr or $120,000/yr).
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

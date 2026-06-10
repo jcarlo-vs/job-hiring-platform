@@ -60,7 +60,7 @@ export default async function JobDetailPage({
     alreadyApplied = !!existing;
   }
 
-  const salary = formatSalary(job.salary_min, job.salary_max);
+  const salary = formatSalary(job.salary_min, job.salary_max, job.salary_period);
 
   return (
     <article className="mx-auto max-w-3xl px-6 py-10">

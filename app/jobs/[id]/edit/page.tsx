@@ -49,6 +49,7 @@ export default async function EditJobPage({
             location: job.location ?? undefined,
             salaryMin: job.salary_min?.toString(),
             salaryMax: job.salary_max?.toString(),
+            salaryPeriod: job.salary_period,
             employmentType: job.employment_type,
             workMode: job.work_mode,
             expiresAt: job.expires_at ? job.expires_at.slice(0, 10) : undefined,

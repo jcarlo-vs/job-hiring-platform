@@ -8,7 +8,7 @@ import {
 } from "@/lib/jobs";
 
 export function JobCard({ job }: { job: Job }) {
-  const salary = formatSalary(job.salary_min, job.salary_max);
+  const salary = formatSalary(job.salary_min, job.salary_max, job.salary_period);
 
   return (
     <Link

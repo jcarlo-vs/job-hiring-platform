@@ -75,13 +75,15 @@
 - [x] README.md: architecture diagram, live link, setup steps, responsible-AI note  <!-- mermaid screening pipeline, env table, setup w/ Inngest dev server. Screenshots: placeholder note for docs/screenshots (user to capture from the live UI). -->
 - Verified: typecheck + lint + `next build` clean; landing renders. Both email functions proven firing locally end-to-end (triggered application/submitted + application/stage-changed; each resolved the applicant email and rendered the correct subject, then logged "would send ... to <email>"). The only thing gated on a key is the literal Resend API call -> Phase 8. (onboarding@resend.dev only delivers to the Resend-account email until a domain is verified.)
 
-## Phase 7 - Stretch (optional, pick 1-2)
-- [ ] Auto re-screen all applicants when a job's requirements change
+## Phase 7 - Stretch (optional)
+- [x] Auto re-screen all applicants when a job's requirements change  <!-- updateJob: on a requirements change, reset the job's applications to PENDING + re-enqueue application/submitted -->
 - [ ] Employer analytics: funnel/conversion per job
 - [ ] Applicant: saved searches + email job alerts
 - [ ] Realtime updates (Supabase Realtime) so the dashboard updates live as screenings finish
 - [ ] Rate limiting on apply + screening endpoints
 - [ ] Basic evals for the screening prompt (a small fixed set of resume/JD pairs with expected outcomes)
+- [x] (added) Resume viewer rebuilt with PDF.js (bytes -> canvas) + click-to-expand modal - fixes browsers set to download PDFs instead of rendering them; served same-origin via /api/resume/[applicationId] (RLS-gated)
+- [x] (added) Salary period (HOURLY/MONTHLY/ANNUAL) on jobs - employer picks it in the post/edit form; shows as $X/hr, /mo, /yr (migration 20260610120000_salary_period)
 
 ## Phase 8 - Production deployment & go-live (do LAST; all prod + registration work lives here)
 Local dev needs NONE of this. The app runs fully locally - the Inngest dev server needs no account, and screening already works with the local ANTHROPIC_API_KEY. These items only make the live Vercel site fully functional.

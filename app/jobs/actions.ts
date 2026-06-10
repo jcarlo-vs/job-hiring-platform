@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { applicationSubmitted, inngest } from "@/lib/inngest/client";
 import { createClient } from "@/utils/supabase/server";
 
 export type JobFormState = { error?: string } | undefined;
@@ -16,6 +17,7 @@ const jobSchema = z
     location: z.string().trim().max(200).optional(),
     salaryMin: z.number().int().nonnegative().nullable(),
     salaryMax: z.number().int().nonnegative().nullable(),
+    salaryPeriod: z.enum(["HOURLY", "MONTHLY", "ANNUAL"]),
     employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]),
     workMode: z.enum(["REMOTE", "ONSITE", "HYBRID"]),
     expiresAt: z.string().min(1, "Expiry date is required"),
@@ -48,6 +50,7 @@ function parseJob(formData: FormData) {
     location: location === "" ? undefined : location,
     salaryMin: toNumberOrNull(formData.get("salaryMin")),
     salaryMax: toNumberOrNull(formData.get("salaryMax")),
+    salaryPeriod: formData.get("salaryPeriod"),
     employmentType: formData.get("employmentType"),
     workMode: formData.get("workMode"),
     expiresAt: formData.get("expiresAt"),
@@ -97,6 +100,7 @@ export async function createJob(
       location: d.location ?? null,
       salary_min: d.salaryMin,
       salary_max: d.salaryMax,
+      salary_period: d.salaryPeriod,
       employment_type: d.employmentType,
       work_mode: d.workMode,
       status: "OPEN",
@@ -127,6 +131,13 @@ export async function updateJob(
   }
   const d = parsed.data;
 
+  // Read current requirements first, to detect a change (for auto re-screen).
+  const { data: existing } = await supabase
+    .from("jobs")
+    .select("requirements")
+    .eq("id", jobId)
+    .single();
+
   // RLS (jobs_update_own) ensures the employer can only update their own job.
   const { error } = await supabase
     .from("jobs")
@@ -137,6 +148,7 @@ export async function updateJob(
       location: d.location ?? null,
       salary_min: d.salaryMin,
       salary_max: d.salaryMax,
+      salary_period: d.salaryPeriod,
       employment_type: d.employmentType,
       work_mode: d.workMode,
       expires_at: expiryToTimestamp(d.expiresAt),
@@ -145,9 +157,34 @@ export async function updateJob(
 
   if (error) return { error: error.message };
 
+  // Stretch: when the requirements change, the old AI scores no longer reflect
+  // the bar. Reset every applicant on this job to PENDING (RLS-scoped via
+  // owns_job) and re-enqueue screening; the worker re-scores against the new
+  // requirements. Best-effort - a queue hiccup must not fail the edit.
+  if (existing && existing.requirements !== d.requirements) {
+    const { data: apps } = await supabase
+      .from("applications")
+      .update({ screening_status: "PENDING" })
+      .eq("job_id", jobId)
+      .select("id");
+    if (apps && apps.length > 0) {
+      try {
+        await inngest.send(
+          apps.map((a) => ({
+            name: applicationSubmitted.event,
+            data: { applicationId: a.id },
+          })),
+        );
+      } catch (err) {
+        console.error(`[job ${jobId}] failed to enqueue re-screen:`, err);
+      }
+    }
+  }
+
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/dashboard");
+  revalidatePath(`/jobs/${jobId}/applicants`);
   redirect(`/jobs/${jobId}`);
 }
 
