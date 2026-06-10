@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   PIPELINE_STAGES,
@@ -14,6 +15,8 @@ import {
   type ApplicationStage,
   type ScreeningStatus,
 } from "@/lib/applications";
+
+import { createClient } from "@/utils/supabase/client";
 
 import { updateApplicationStage } from "./actions";
 import { PipelineBoard } from "./pipeline-board";
@@ -100,9 +103,71 @@ export function ApplicantsView({
   jobId: string;
   applicants: ApplicantRow[];
 }) {
+  const router = useRouter();
   // Local copy so table + board share one optimistic source of truth.
   const [applicants, setApplicants] = useState(initial);
+  // Adopt fresh server data after a router.refresh() (React's documented
+  // adjust-state-when-props-change pattern; runs during render, not an effect).
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setApplicants(initial);
+  }
   const [, startTransition] = useTransition();
+
+  // Live updates: merge screening results / stage changes as they land in the
+  // DB (Supabase Realtime; RLS scopes events to rows this employer can read).
+  // New applications need a server read for the name, so they full-refresh.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`applications-${jobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "applications",
+          filter: `job_id=eq.${jobId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            stage: ApplicationStage;
+            screening_status: ScreeningStatus;
+            ai_score: number | null;
+            ai_recommendation: AiRecommendation | null;
+          };
+          setApplicants((cur) =>
+            cur.map((a) =>
+              a.id === row.id
+                ? {
+                    ...a,
+                    stage: row.stage,
+                    screeningStatus: row.screening_status,
+                    aiScore: row.ai_score,
+                    aiRecommendation: row.ai_recommendation,
+                  }
+                : a,
+            ),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "applications",
+          filter: `job_id=eq.${jobId}`,
+        },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [jobId, router]);
   const [view, setView] = useState<View>("table");
   const [stageFilter, setStageFilter] = useState<ApplicationStage | "ALL">("ALL");
   const [sort, setSort] = useState<SortKey>("recommended");

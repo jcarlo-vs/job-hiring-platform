@@ -77,13 +77,16 @@
 
 ## Phase 7 - Stretch (optional)
 - [x] Auto re-screen all applicants when a job's requirements change  <!-- updateJob: on a requirements change, reset the job's applications to PENDING + re-enqueue application/submitted -->
-- [ ] Employer analytics: funnel/conversion per job
+- [x] Employer analytics: funnel/conversion per job  <!-- per-job pipeline funnel (reached count + conversion % per stage) on the applicants page; live with stage moves -->
 - [ ] Applicant: saved searches + email job alerts
-- [ ] Realtime updates (Supabase Realtime) so the dashboard updates live as screenings finish
+- [x] Realtime updates (Supabase Realtime) so the dashboard updates live as screenings finish  <!-- applications added to the supabase_realtime publication (migration 20260610140000); ApplicantsView subscribes to UPDATE (merges screening_status/score/recommendation/stage into table+board live) and INSERT (router.refresh for the new row's name); RLS scopes events -->
 - [ ] Rate limiting on apply + screening endpoints
-- [ ] Basic evals for the screening prompt (a small fixed set of resume/JD pairs with expected outcomes)
+- [x] Basic evals for the screening prompt  <!-- evals/cases.ts + evals/run.ts; `npm run eval` (tsx) asserts recommendation/score buckets; not auto-run in CI -->
 - [x] (added) Resume viewer rebuilt with PDF.js (bytes -> canvas) + click-to-expand modal - fixes browsers set to download PDFs instead of rendering them; served same-origin via /api/resume/[applicationId] (RLS-gated)
 - [x] (added) Salary period (HOURLY/MONTHLY/ANNUAL) on jobs - employer picks it in the post/edit form; shows as $X/hr, /mo, /yr (migration 20260610120000_salary_period)
+- [x] (added) Signup captures employer company/project name + applicant phone (migration 20260610130000; handle_new_user trigger)
+- [x] (added) Deliberate hiring email flow - Message panel on the candidate page (Advance/Reject/Custom templates from company + position + name, editable, Resend send, logged to application_emails with a Sent history + phone shown). Replaced the auto stage-change email.
+- [x] (added) Applicant table rows fully clickable (stretched-link; stage select stays interactive)
 
 ## Phase 8 - Production deployment & go-live (do LAST; all prod + registration work lives here)
 Local dev needs NONE of this. The app runs fully locally - the Inngest dev server needs no account, and screening already works with the local ANTHROPIC_API_KEY. These items only make the live Vercel site fully functional.
