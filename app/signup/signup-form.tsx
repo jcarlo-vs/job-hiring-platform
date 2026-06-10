@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { signup, type AuthState } from "@/app/auth/actions";
 
@@ -9,6 +9,7 @@ export function SignupForm() {
     signup,
     undefined,
   );
+  const [role, setRole] = useState("APPLICANT");
 
   if (state?.message) {
     return <p className="form-note">{state.message}</p>;
@@ -71,6 +72,7 @@ export function SignupForm() {
               name="role"
               value="APPLICANT"
               defaultChecked
+              onChange={() => setRole("APPLICANT")}
               className="accent-primary"
             />
             Job seeker
@@ -80,12 +82,46 @@ export function SignupForm() {
               type="radio"
               name="role"
               value="EMPLOYER"
+              onChange={() => setRole("EMPLOYER")}
               className="accent-primary"
             />
             Employer
           </label>
         </div>
       </fieldset>
+
+      {role === "EMPLOYER" ? (
+        <div>
+          <label htmlFor="companyName" className="field-label">
+            Company or project name
+          </label>
+          <input
+            id="companyName"
+            name="companyName"
+            type="text"
+            required
+            autoComplete="organization"
+            className="field-input"
+          />
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="phone" className="field-label">
+            Phone number
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            autoComplete="tel"
+            className="field-input"
+          />
+          <p className="text-muted mt-1 text-xs">
+            So the hiring team can reach you about interviews.
+          </p>
+        </div>
+      )}
 
       <button type="submit" disabled={pending} className="btn-primary w-full">
         {pending ? "Creating account..." : "Create account"}

@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-import { STAGE_LABELS, type ApplicationStage } from "@/lib/applications";
-
 // SERVER ONLY. Transactional email via Resend. No-ops with a warning when
 // RESEND_API_KEY is unset (e.g. local dev without a key) so callers never crash.
 
@@ -58,7 +56,7 @@ function layout(heading: string, body: string, cta?: { label: string; href: stri
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
     <div style="font-weight:700;font-size:18px;margin-bottom:24px">Talent<span style="color:#9b5de5">Screen</span></div>
     <div style="background:#ffffff;border:2px solid #ece7f5;border-radius:16px;padding:24px">
-      <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
+      ${heading ? `<h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>` : ""}
       ${body}
       ${button}
     </div>
@@ -83,27 +81,21 @@ export function applicationReceivedEmail(args: {
   };
 }
 
-export function stageChangeEmail(args: {
-  name: string | null;
-  jobTitle: string;
-  stage: ApplicationStage;
-}): { subject: string; html: string } {
-  const greeting = args.name ? `Hi ${args.name},` : "Hi,";
-  const stageLabel = STAGE_LABELS[args.stage];
-
-  const message =
-    args.stage === "REJECTED"
-      ? `<p style="margin:0 0 12px;line-height:1.6">After review, the team has decided not to move forward with your application for <strong>${args.jobTitle}</strong> at this time. We appreciate the time you took to apply and wish you the best in your search.</p>`
-      : args.stage === "OFFER"
-        ? `<p style="margin:0 0 12px;line-height:1.6">Great news - your application for <strong>${args.jobTitle}</strong> has advanced to <strong>${stageLabel}</strong>. The team will be in touch with next steps.</p>`
-        : `<p style="margin:0 0 12px;line-height:1.6">Your application for <strong>${args.jobTitle}</strong> has moved to <strong>${stageLabel}</strong>.</p>`;
-
-  return {
-    subject: `Update on your application for ${args.jobTitle}`,
-    html: layout(
-      "Application update",
-      `<p style="margin:0 0 12px;line-height:1.6">${greeting}</p>${message}`,
-      { label: "View my applications", href: `${SITE_URL}/applications` },
-    ),
-  };
+/**
+ * Wrap a hiring manager's plain-text message (from the candidate page) in the
+ * branded shell. Escapes the text and preserves paragraph + line breaks.
+ */
+export function composeEmailHtml(bodyText: string): string {
+  const escaped = bodyText
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const paragraphs = escaped
+    .split(/\n{2,}/)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 12px;line-height:1.6">${p.replace(/\n/g, "<br/>")}</p>`,
+    )
+    .join("");
+  return layout("", paragraphs);
 }

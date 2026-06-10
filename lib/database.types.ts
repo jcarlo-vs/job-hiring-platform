@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_emails: {
+        Row: {
+          application_id: string
+          body: string
+          id: string
+          kind: string
+          sent_at: string
+          sent_by: string | null
+          subject: string
+        }
+        Insert: {
+          application_id: string
+          body: string
+          id?: string
+          kind: string
+          sent_at?: string
+          sent_by?: string | null
+          subject: string
+        }
+        Update: {
+          application_id?: string
+          body?: string
+          id?: string
+          kind?: string
+          sent_at?: string
+          sent_by?: string | null
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_emails_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_emails_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       applications: {
         Row: {
           ai_flags: Json | null
@@ -162,27 +207,33 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_name: string | null
           created_at: string
           full_name: string | null
           id: string
+          phone: string | null
           resume_filename: string | null
           resume_path: string | null
           resume_uploaded_at: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
+          company_name?: string | null
           created_at?: string
           full_name?: string | null
           id: string
+          phone?: string | null
           resume_filename?: string | null
           resume_path?: string | null
           resume_uploaded_at?: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Update: {
+          company_name?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          phone?: string | null
           resume_filename?: string | null
           resume_path?: string | null
           resume_uploaded_at?: string | null

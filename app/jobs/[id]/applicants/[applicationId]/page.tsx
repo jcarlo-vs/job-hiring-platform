@@ -7,12 +7,14 @@ import {
   SCREENING_LABELS,
   STAGE_LABELS,
 } from "@/lib/applications";
-import { getUser } from "@/lib/auth";
+import { getProfile } from "@/lib/auth";
+import { formatDate } from "@/lib/jobs";
 import { resumeExtension } from "@/lib/resume";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 import { CandidateActions } from "./candidate-actions";
+import { MessageCandidate } from "./message-candidate";
 import { ResumeViewer } from "./resume-viewer";
 
 /** Read a jsonb column that holds a string array, defensively. */
@@ -29,8 +31,8 @@ export default async function CandidatePage({
 }) {
   const { id: jobId, applicationId } = await params;
 
-  const user = await getUser();
-  if (!user) {
+  const profile = await getProfile();
+  if (!profile) {
     redirect(`/login?next=/jobs/${jobId}/applicants/${applicationId}`);
   }
 
@@ -41,7 +43,7 @@ export default async function CandidatePage({
     .select("id, title, employer_id")
     .eq("id", jobId)
     .single();
-  if (!job || job.employer_id !== user.id) notFound();
+  if (!job || job.employer_id !== profile.id) notFound();
 
   // RLS (private.owns_job) also gates this read; the explicit check above keeps
   // the not-found path clean.
@@ -55,12 +57,20 @@ export default async function CandidatePage({
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin
+  const { data: applicantProfile } = await admin
     .from("profiles")
-    .select("full_name")
+    .select("full_name, phone")
     .eq("id", app.applicant_id)
     .single();
-  const name = profile?.full_name || "Candidate";
+  const name = applicantProfile?.full_name || "Candidate";
+  const phone = applicantProfile?.phone ?? null;
+  const company = profile.company_name ?? "[Your Company]";
+
+  const { data: sentEmails } = await admin
+    .from("application_emails")
+    .select("kind, subject, sent_at")
+    .eq("application_id", app.id)
+    .order("sent_at", { ascending: false });
 
   // Served same-origin via the resume route (reliable embedding + the modal).
   const isPdf = app.resume_path
@@ -89,6 +99,11 @@ export default async function CandidatePage({
           {STAGE_LABELS[app.stage]}
         </span>
       </div>
+      {phone && (
+        <p className="text-muted mt-1 text-sm">
+          Phone: <span className="text-foreground font-medium">{phone}</span>
+        </p>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
         {/* Left: AI screening + actions */}
@@ -167,6 +182,43 @@ export default async function CandidatePage({
                 canRescreen={canRescreen}
               />
             </div>
+          </section>
+
+          <section className="border-border rounded-2xl border-2 bg-white p-6">
+            <h2 className="font-semibold">Message candidate</h2>
+            {phone && (
+              <p className="text-muted mt-1 text-xs">
+                HR can reach them at {phone}.
+              </p>
+            )}
+            <div className="mt-4">
+              <MessageCandidate
+                jobId={jobId}
+                applicationId={app.id}
+                applicantName={name}
+                company={company}
+                position={job.title}
+                recommendation={app.ai_recommendation}
+              />
+            </div>
+            {sentEmails && sentEmails.length > 0 && (
+              <div className="border-border mt-5 border-t pt-4">
+                <h3 className="text-muted text-xs font-semibold tracking-wide uppercase">
+                  Sent
+                </h3>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {sentEmails.map((e, i) => (
+                    <li
+                      key={i}
+                      className="text-muted flex justify-between gap-3"
+                    >
+                      <span className="truncate">{e.subject}</span>
+                      <span className="shrink-0">{formatDate(e.sent_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         </div>
 

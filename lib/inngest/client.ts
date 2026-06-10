@@ -19,13 +19,3 @@ export const inngest = new Inngest({ id: "job-hiring-platform" });
 export const applicationSubmitted = eventType("application/submitted", {
   schema: staticSchema<{ applicationId: string }>(),
 });
-
-/**
- * Fired when an employer moves a candidate to a new stage (via
- * updateApplicationStage). Drives the applicant stage-change email. Not fired
- * for the worker's automatic APPLIED -> SCREENED transition, which is not a
- * human decision and writes the stage directly.
- */
-export const applicationStageChanged = eventType("application/stage-changed", {
-  schema: staticSchema<{ applicationId: string; stage: string }>(),
-});

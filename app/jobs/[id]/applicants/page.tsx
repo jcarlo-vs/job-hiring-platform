@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import {
-  PIPELINE_STAGES,
-  STAGE_LABELS,
-  type ApplicationStage,
-} from "@/lib/applications";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -63,14 +58,6 @@ export default async function ApplicantsPage({
     aiRecommendation: a.ai_recommendation,
   }));
 
-  const byStage = applicants.reduce<Partial<Record<ApplicationStage, number>>>(
-    (acc, a) => {
-      acc[a.stage] = (acc[a.stage] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
-
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <Link href="/dashboard" className="text-muted text-sm hover:underline">
@@ -87,11 +74,6 @@ export default async function ApplicantsPage({
       </div>
       <p className="text-muted mt-1 text-sm">
         {applicants.length} applicant{applicants.length === 1 ? "" : "s"}
-        {applicants.length > 0 &&
-          " - " +
-            PIPELINE_STAGES.filter((s) => byStage[s])
-              .map((s) => `${byStage[s]} ${STAGE_LABELS[s]}`)
-              .join(", ")}
       </p>
 
       {applicants.length === 0 ? (

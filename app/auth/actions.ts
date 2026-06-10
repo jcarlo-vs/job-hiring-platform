@@ -8,12 +8,23 @@ import { createClient } from "@/utils/supabase/server";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
-const signupSchema = z.object({
-  fullName: z.string().trim().min(1, "Full name is required").max(120),
-  email: z.string().trim().email("Enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["APPLICANT", "EMPLOYER"]),
-});
+const signupSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Full name is required").max(120),
+    email: z.string().trim().email("Enter a valid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    role: z.enum(["APPLICANT", "EMPLOYER"]),
+    companyName: z.string().trim().max(200).optional(),
+    phone: z.string().trim().max(40).optional(),
+  })
+  .refine((d) => d.role !== "EMPLOYER" || !!d.companyName, {
+    message: "Company or project name is required",
+    path: ["companyName"],
+  })
+  .refine((d) => d.role !== "APPLICANT" || !!d.phone, {
+    message: "Phone number is required",
+    path: ["phone"],
+  });
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
@@ -29,6 +40,8 @@ export async function signup(
     email: formData.get("email"),
     password: formData.get("password"),
     role: formData.get("role"),
+    companyName: formData.get("companyName") ?? undefined,
+    phone: formData.get("phone") ?? undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -39,7 +52,12 @@ export async function signup(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      data: { full_name: parsed.data.fullName, role: parsed.data.role },
+      data: {
+        full_name: parsed.data.fullName,
+        role: parsed.data.role,
+        company_name: parsed.data.companyName ?? "",
+        phone: parsed.data.phone ?? "",
+      },
     },
   });
 

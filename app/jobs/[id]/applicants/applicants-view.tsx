@@ -37,6 +37,62 @@ const SORT_LABELS: Record<SortKey, string> = {
   recent: "Most recent",
 };
 
+// Forward progression for the funnel; REJECTED is an exit, counted separately.
+const FUNNEL_STAGES: ApplicationStage[] = [
+  "APPLIED",
+  "SCREENED",
+  "TECH_INTERVIEW",
+  "FINAL",
+  "OFFER",
+];
+
+/** Per-job funnel: how many applicants reached each stage, with conversion %. */
+function JobFunnel({ applicants }: { applicants: ApplicantRow[] }) {
+  const total = applicants.length;
+  if (total === 0) return null;
+  const rejected = applicants.filter((a) => a.stage === "REJECTED").length;
+  // reached[i] = applicants currently at or beyond progression stage i.
+  const reached = FUNNEL_STAGES.map((_, i) =>
+    applicants.filter((a) => {
+      const idx = FUNNEL_STAGES.indexOf(a.stage);
+      return idx !== -1 && idx >= i;
+    }).length,
+  );
+
+  return (
+    <div className="border-border mb-6 rounded-2xl border-2 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Pipeline funnel</h2>
+        {rejected > 0 && (
+          <span className="text-muted text-xs">{rejected} rejected</span>
+        )}
+      </div>
+      <div className="mt-3 space-y-2">
+        {FUNNEL_STAGES.map((stage, i) => {
+          const count = reached[i];
+          const pct = Math.round((count / total) * 100);
+          return (
+            <div key={stage}>
+              <div className="text-muted flex justify-between text-xs">
+                <span>{STAGE_LABELS[stage]}</span>
+                <span className="tabular-nums">
+                  {count} ({pct}%)
+                </span>
+              </div>
+              <div className="bg-border mt-0.5 h-2 overflow-hidden rounded-full">
+                <div
+                  className="bg-primary h-full rounded-full transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ApplicantsView({
   jobId,
   applicants: initial,
@@ -88,6 +144,7 @@ export function ApplicantsView({
 
   return (
     <div className="mt-6">
+      <JobFunnel applicants={applicants} />
       <div className="flex flex-wrap items-center gap-3">
         <div className="border-border inline-flex rounded-full border-2 p-0.5 text-sm">
           {(["table", "board"] as View[]).map((v) => (
@@ -159,12 +216,12 @@ export function ApplicantsView({
           {visible.map((a) => (
             <li
               key={a.id}
-              className="border-border flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border-2 bg-white p-4"
+              className="border-border hover:border-primary relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border-2 bg-white p-4 transition-colors"
             >
               <div className="min-w-[10rem] flex-1">
                 <Link
                   href={`/jobs/${jobId}/applicants/${a.id}`}
-                  className="font-semibold hover:underline"
+                  className="font-semibold hover:underline after:absolute after:inset-0"
                 >
                   {a.applicantName}
                 </Link>
@@ -193,7 +250,7 @@ export function ApplicantsView({
                 value={a.stage}
                 disabled={savingId === a.id}
                 onChange={(e) => move(a.id, e.target.value as ApplicationStage)}
-                className="field-input w-auto py-1 text-sm disabled:opacity-50"
+                className="field-input relative z-10 w-auto py-1 text-sm disabled:opacity-50"
                 aria-label={`Stage for ${a.applicantName}`}
               >
                 {PIPELINE_STAGES.map((s) => (
