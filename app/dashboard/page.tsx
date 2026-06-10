@@ -63,7 +63,7 @@ export default async function DashboardPage() {
     }
 
     return (
-      <div className="mx-auto max-w-5xl px-6 py-12">
+      <div className="mx-auto max-w-7xl px-6 py-12">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-muted text-sm">Employer dashboard</p>
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
   const prefs = profile.preferred_categories ?? [];
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="mx-auto max-w-7xl px-6 py-12">
       {needsOnboarding && <OnboardingModal categories={categoryOptions} />}
       <p className="text-muted text-sm">Your dashboard</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight">

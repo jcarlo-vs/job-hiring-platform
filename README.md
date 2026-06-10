@@ -4,10 +4,19 @@
 
 A full-stack job board and applicant tracking system. Applicants apply with a resume; an AI screens each one against the job's requirements and produces an explainable match score; employers review candidates ranked by that score and move them through a hiring pipeline. The AI advises - it never decides.
 
-- **Live demo:** https://job-hiring-platform-eight.vercel.app
-- **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Supabase - Inngest - Claude - Resend
+- **Live demo:** https://talent-screen.vercel.app
+- **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Supabase - Inngest - Anthropic - Resend
 
 > Portfolio project. Build log in [PROGRESS.md](./PROGRESS.md); the full decision log (with reasons) is in [DECISIONS.md](./DECISIONS.md).
+
+### Demo accounts
+
+Sign in to explore both sides without registering (or create your own). Password for all: `Demo!Screen2026`
+
+| Role | Email |
+| --- | --- |
+| Employer - Nimbus Labs (12 open roles, pre-screened applicants) | `recruiter@talentscreen.dev` |
+| Job seeker - Ada Reyes (applications across stages) | `ada.demo@talentscreen.dev` |
 
 ## Responsible AI: human-in-the-loop by design
 
@@ -23,7 +32,7 @@ The screening AI is a **decision-support tool, not the decision-maker** - this i
 - **Auth and roles** (employer vs. applicant) with Postgres Row Level Security as the security boundary.
 - **Employers:** post, edit, close/reopen, and expire jobs.
 - **Applicants:** upload a resume (PDF/DOCX), apply in one click, and track each application's stage + screening status.
-- **AI screening pipeline:** runs in the background on apply - downloads the resume, extracts its text, calls Claude, and persists an explainable score.
+- **AI screening pipeline:** runs in the background on apply - downloads the resume, extracts its text, calls the AI, and persists an explainable score.
 - **Hiring pipeline:** per-job applicant table (sortable recommended-first, filterable by stage), a drag-and-drop Kanban board, and a candidate detail view with an inline resume preview, the AI breakdown, stage controls, and a manual re-screen.
 - **Transactional email** (Resend): application-received and stage-change notifications.
 
@@ -38,7 +47,7 @@ flowchart LR
   C --> D{Inngest worker}
   D --> E[Claim: PENDING -> PROCESSING<br/>atomic, idempotent]
   E --> F[Download resume + extract text<br/>unpdf / mammoth]
-  F --> G[Claude Haiku 4.5<br/>structured-output screening]
+  F --> G[AI model<br/>structured-output screening]
   G --> H[Persist score + recommendation<br/>+ matched/missing/flags<br/>DONE, stage -> SCREENED]
   H --> I[Employer reviews + decides]
 ```
@@ -55,7 +64,7 @@ flowchart LR
 | Language / UI | TypeScript, React 19, Tailwind CSS v4 |
 | Data / auth / files | Supabase (Postgres, Auth, Storage) with Row Level Security |
 | Background jobs | Inngest (retries, concurrency, idempotency, dashboard) |
-| AI | Anthropic Claude (`claude-haiku-4-5`) with structured outputs |
+| AI | Anthropic API with structured outputs |
 | Resume parsing | `unpdf` (PDF) + `mammoth` (DOCX) |
 | Drag-and-drop | `@dnd-kit/core` |
 | Email | Resend |
@@ -82,6 +91,9 @@ npm run dev                 # http://localhost:3000
 
 # 5. Run the background-jobs dev server (separate terminal) for screening/email
 npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+
+# 6. (Optional) Seed demo data: an employer + a dozen jobs + pre-screened applicants
+node --env-file=.env.local scripts/seed.mjs
 ```
 
 ### Environment variables
@@ -91,7 +103,7 @@ npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase publishable/anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; signed URLs + the screening worker |
-| `ANTHROPIC_API_KEY` | for screening | Claude API key |
+| `ANTHROPIC_API_KEY` | for screening | Anthropic API key |
 | `INNGEST_DEV` | local | Set to `1` for the local Inngest dev server |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | prod | Injected by the Inngest Vercel integration |
 | `RESEND_API_KEY` | for email | Resend key; emails no-op if unset |

@@ -86,7 +86,7 @@ export default async function Home() {
         <div className="absolute -left-12 bottom-0 h-72 w-72 rounded-full bg-linear-to-tr from-[#00bbf9] to-[#9b5de5] opacity-20 blur-3xl" />
       </div>
 
-      <div className="mx-auto max-w-5xl px-6">
+      <div className="mx-auto max-w-7xl px-6">
         {/* Hero */}
         <section className="py-20 sm:py-28">
           <span className="bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold">

@@ -60,7 +60,7 @@ export default async function ApplicantsPage({
   }));
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-7xl px-6 py-10">
       <BackButton href="/dashboard" label="Dashboard" />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{job.title}</h1>
