@@ -20,6 +20,23 @@ const jobSchema = z
     salaryPeriod: z.enum(["HOURLY", "MONTHLY", "ANNUAL"]),
     employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]),
     workMode: z.enum(["REMOTE", "ONSITE", "HYBRID"]),
+    category: z.enum([
+      "SOFTWARE_ENGINEERING",
+      "DATA_AI",
+      "DESIGN",
+      "PRODUCT",
+      "MARKETING",
+      "SALES",
+      "FINANCE_ACCOUNTING",
+      "OPERATIONS",
+      "CUSTOMER_SUPPORT",
+      "HEALTHCARE",
+      "EDUCATION",
+      "ENGINEERING_TRADES",
+      "LEGAL",
+      "WRITING_CONTENT",
+      "OTHER",
+    ]),
     expiresAt: z.string().min(1, "Expiry date is required"),
   })
   .refine(
@@ -53,6 +70,7 @@ function parseJob(formData: FormData) {
     salaryPeriod: formData.get("salaryPeriod"),
     employmentType: formData.get("employmentType"),
     workMode: formData.get("workMode"),
+    category: formData.get("category"),
     expiresAt: formData.get("expiresAt"),
   });
 }
@@ -103,6 +121,7 @@ export async function createJob(
       salary_period: d.salaryPeriod,
       employment_type: d.employmentType,
       work_mode: d.workMode,
+      category: d.category,
       status: "OPEN",
       expires_at: expiryToTimestamp(d.expiresAt),
     })
@@ -151,6 +170,7 @@ export async function updateJob(
       salary_period: d.salaryPeriod,
       employment_type: d.employmentType,
       work_mode: d.workMode,
+      category: d.category,
       expires_at: expiryToTimestamp(d.expiresAt),
     })
     .eq("id", jobId);

@@ -50,3 +50,96 @@ export const SCREENING_LABELS: Record<ScreeningStatus, string> = {
   DONE: "Screening done",
   ERROR: "Screening failed",
 };
+
+/* ---- Applicant-facing status (the "My applications" view) ----------------
+ * Translates the internal stage + screening status into something an applicant
+ * can track, WITHOUT leaking the raw score, the recommendation label, or the
+ * gap checklist (which would invite resume-gaming). Strengths are surfaced only
+ * for a genuine match, never fabricated for a weak one. */
+
+export type ApplicantStatusTone = "pending" | "active" | "good" | "closed";
+
+export type ApplicantStatus = {
+  label: string;
+  blurb: string;
+  tone: ApplicantStatusTone;
+  /** Index into APPLICANT_MILESTONES the applicant has reached; -1 = closed. */
+  milestone: number;
+  showStrengths: boolean;
+};
+
+export const APPLICANT_MILESTONES = [
+  "Applied",
+  "Screened",
+  "Interview",
+  "Offer",
+] as const;
+
+export function applicantStatus(
+  stage: ApplicationStage,
+  screening: ScreeningStatus,
+  recommendation: AiRecommendation | null,
+): ApplicantStatus {
+  // Still being screened: applies whatever the stage, until results land.
+  if (screening === "PENDING" || screening === "PROCESSING") {
+    return {
+      label: "Reviewing",
+      blurb: "Your application is in and being reviewed. Check back shortly.",
+      tone: "pending",
+      milestone: 0,
+      showStrengths: false,
+    };
+  }
+
+  switch (stage) {
+    case "REJECTED":
+      return {
+        label: "Closed",
+        blurb:
+          "The team has decided not to move forward this time. Thank you for taking the time to apply.",
+        tone: "closed",
+        milestone: -1,
+        showStrengths: false,
+      };
+    case "TECH_INTERVIEW":
+      return {
+        label: "Interview",
+        blurb:
+          "Great news - the team wants to talk. Keep an eye on your email for details.",
+        tone: "good",
+        milestone: 2,
+        showStrengths: false,
+      };
+    case "FINAL":
+      return {
+        label: "Final round",
+        blurb: "You're in the final round. A decision should be close.",
+        tone: "good",
+        milestone: 2,
+        showStrengths: false,
+      };
+    case "OFFER":
+      return {
+        label: "Offer",
+        blurb: "Congratulations - the team is preparing an offer for you!",
+        tone: "good",
+        milestone: 3,
+        showStrengths: false,
+      };
+    default: {
+      // APPLIED (post-screen) or SCREENED: reviewed, now with the team. Show
+      // strengths only for a real match; weak results get an honest, kind note.
+      const matched =
+        recommendation === "STRONG" || recommendation === "MODERATE";
+      return {
+        label: "Screened",
+        tone: "active",
+        milestone: 1,
+        showStrengths: matched,
+        blurb: matched
+          ? "Your application has been reviewed and is with the hiring team."
+          : "Your application has been reviewed. The team is prioritizing candidates who most closely match the core requirements.",
+      };
+    }
+  }
+}

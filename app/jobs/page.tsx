@@ -1,9 +1,10 @@
 import Link from "next/link";
 
-import { JobCard } from "@/components/job-card";
 import { JobFilters } from "@/components/job-filters";
+import { JobsMasterDetail } from "@/components/jobs-master-detail";
+import { getProfile } from "@/lib/auth";
 import { Constants } from "@/lib/database.types";
-import { PAGE_SIZE } from "@/lib/jobs";
+import { PAGE_SIZE, isValidCategory } from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -24,7 +25,22 @@ export default async function JobsPage({
   const employmentType = str(sp, "employment_type");
   const workMode = str(sp, "work_mode");
   const salaryMin = str(sp, "salary_min");
+  const categoryRaw = sp["category"];
+  const categoryAbsent = categoryRaw === undefined;
+  const categoryParam =
+    typeof categoryRaw === "string" ? categoryRaw.trim() : "";
   const page = Math.max(1, Number.parseInt(str(sp, "page") || "1", 10) || 1);
+
+  // Viewer (request-cached). Drives the panel CTA and the personalized filter.
+  const profile = await getProfile();
+  const prefs =
+    profile?.role === "APPLICANT" ? (profile.preferred_categories ?? []) : [];
+  const validCategory = isValidCategory(categoryParam) ? categoryParam : null;
+  // Pre-apply the applicant's interests only on a fresh visit (no category
+  // param at all). Any explicit value - a blank "Any category" submit or the
+  // "all" opt-out link - turns personalization off and shows everything, so
+  // the dropdown never disagrees with the results and the opt-out stays sticky.
+  const preApplied = !validCategory && categoryAbsent && prefs.length > 0;
 
   const supabase = await createClient();
   let query = supabase
@@ -60,6 +76,11 @@ export default async function JobsPage({
       workMode as (typeof Constants.public.Enums.work_mode)[number],
     );
   }
+  if (validCategory) {
+    query = query.eq("category", validCategory);
+  } else if (preApplied) {
+    query = query.in("category", prefs);
+  }
   const salaryMinNum = Number.parseInt(salaryMin, 10);
   if (Number.isFinite(salaryMinNum) && salaryMinNum > 0) {
     query = query.gte("salary_max", salaryMinNum);
@@ -76,6 +97,28 @@ export default async function JobsPage({
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  // Per-job apply-state for the panel CTA: the viewer's applied job ids among
+  // this page's results (bounded by PAGE_SIZE). Guests skip the query.
+  let appliedJobIds: string[] = [];
+  if (profile && jobs && jobs.length > 0) {
+    const { data: applied } = await supabase
+      .from("applications")
+      .select("job_id")
+      .eq("applicant_id", profile.id)
+      .in(
+        "job_id",
+        jobs.map((j) => j.id),
+      );
+    appliedJobIds = [...new Set((applied ?? []).map((a) => a.job_id))];
+  }
+
+  const viewer = {
+    userId: profile?.id ?? null,
+    viewerRole: profile?.role ?? null,
+    hasResume: !!profile?.resume_path,
+    resumeFilename: profile?.resume_filename ?? null,
+  };
+
   const pageHref = (p: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -83,13 +126,14 @@ export default async function JobsPage({
     if (employmentType) params.set("employment_type", employmentType);
     if (workMode) params.set("work_mode", workMode);
     if (salaryMin) params.set("salary_min", salaryMin);
+    if (!categoryAbsent) params.set("category", categoryParam);
     if (p > 1) params.set("page", String(p));
     const qs = params.toString();
     return qs ? `/jobs?${qs}` : "/jobs";
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-7xl px-6 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Browse jobs</h1>
       <p className="text-muted mt-1 text-sm">
         {total} open {total === 1 ? "role" : "roles"}
@@ -102,53 +146,48 @@ export default async function JobsPage({
           employmentType={employmentType}
           workMode={workMode}
           salaryMin={salaryMin}
+          category={validCategory ?? ""}
         />
       </div>
 
+      {preApplied && (
+        <div className="border-border mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 bg-white p-4 text-sm">
+          <span className="font-semibold">Showing roles in your interests.</span>
+          <span className="flex gap-4">
+            <Link
+              href="/jobs?category=all"
+              className="text-primary font-semibold hover:underline"
+            >
+              Show all jobs
+            </Link>
+            <Link
+              href="/settings/preferences"
+              className="text-muted hover:text-foreground font-semibold"
+            >
+              Edit interests
+            </Link>
+          </span>
+        </div>
+      )}
+
       {error ? (
-        <p className="form-error mt-8">
-          Could not load jobs. Please try again.
-        </p>
+        <p className="form-error mt-8">Could not load jobs. Please try again.</p>
       ) : !jobs || jobs.length === 0 ? (
-        <div className="border-border text-muted mt-8 rounded-lg border border-dashed p-12 text-center text-sm">
+        <div className="border-border text-muted mt-8 rounded-2xl border-2 border-dashed p-12 text-center text-sm">
           No jobs match your search. Try clearing the filters.
         </div>
       ) : (
-        <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
-              <JobCard key={job.id} job={job} />
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="text-muted mt-8 flex items-center justify-between text-sm">
-              {page > 1 ? (
-                <Link
-                  href={pageHref(page - 1)}
-                  className="hover:text-foreground"
-                >
-                  &larr; Previous
-                </Link>
-              ) : (
-                <span className="opacity-40">&larr; Previous</span>
-              )}
-              <span>
-                Page {page} of {totalPages}
-              </span>
-              {page < totalPages ? (
-                <Link
-                  href={pageHref(page + 1)}
-                  className="hover:text-foreground"
-                >
-                  Next &rarr;
-                </Link>
-              ) : (
-                <span className="opacity-40">Next &rarr;</span>
-              )}
-            </div>
-          )}
-        </>
+        <JobsMasterDetail
+          jobs={jobs}
+          appliedJobIds={appliedJobIds}
+          viewer={viewer}
+          pagination={{
+            page,
+            totalPages,
+            prevHref: page > 1 ? pageHref(page - 1) : null,
+            nextHref: page < totalPages ? pageHref(page + 1) : null,
+          }}
+        />
       )}
     </div>
   );

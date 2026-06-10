@@ -27,10 +27,17 @@ export default function RootLayout({
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <SiteHeader />
         <main className="flex-1">{children}</main>
-        <footer className="border-border text-muted border-t">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-sm">
-            Built with Next.js, Supabase, Inngest, and Claude - a portfolio
-            project.
+        <footer className="border-border border-t">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-extrabold">
+                Talent<span className="text-primary">Screen</span>
+              </p>
+              <p className="text-muted mt-1 text-sm">
+                AI-powered screening. Human-powered decisions.
+              </p>
+            </div>
+            <p className="text-muted text-xs">&copy; 2026 TalentScreen</p>
           </div>
         </footer>
       </body>

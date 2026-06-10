@@ -1,4 +1,4 @@
-import Link from "next/link";
+"use client";
 
 import { SalaryTag } from "@/components/salary-tag";
 import {
@@ -9,11 +9,33 @@ import {
   type Job,
 } from "@/lib/jobs";
 
-export function JobCard({ job }: { job: Job }) {
+/**
+ * A selectable job card for the desktop master-detail list. Rendered as a
+ * button (role=option) so selection never navigates and there is no nested
+ * anchor. Selected state gets a violet border + ring.
+ */
+export function JobListCard({
+  job,
+  selected,
+  onSelect,
+}: {
+  job: Job;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
   return (
-    <Link
-      href={`/jobs/${job.id}`}
-      className="border-border hover:border-primary block rounded-2xl border-2 bg-white p-5 transition-colors"
+    <button
+      type="button"
+      role="option"
+      id={`job-opt-${job.id}`}
+      aria-selected={selected}
+      tabIndex={-1}
+      onClick={() => onSelect(job.id)}
+      className={`block w-full rounded-2xl border-2 bg-white p-5 text-left transition-colors ${
+        selected
+          ? "border-primary ring-primary/30 bg-primary/5 ring-2"
+          : "border-border hover:border-primary"
+      }`}
     >
       <h3 className="font-bold">{job.title}</h3>
       <div className="text-muted mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -30,24 +52,9 @@ export function JobCard({ job }: { job: Job }) {
         />
       </div>
       <p className="text-muted mt-3 line-clamp-2 text-sm">{job.description}</p>
-      <p className="text-muted mt-3 flex items-center gap-1.5 text-xs">
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          aria-hidden="true"
-          className="h-3.5 w-3.5 shrink-0"
-        >
-          <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.6" />
-          <path
-            d="M10 6.5V10l2.5 1.5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      <p className="text-muted mt-3 text-xs">
         Posted {formatDate(job.created_at)}
       </p>
-    </Link>
+    </button>
   );
 }

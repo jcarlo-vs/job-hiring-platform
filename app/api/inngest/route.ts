@@ -7,7 +7,7 @@ import { screenApplication } from "@/lib/inngest/functions";
 // Node runtime (the default for route handlers): the worker uses unpdf, mammoth,
 // and the Anthropic SDK, which need Node APIs and are not Edge-compatible.
 export const runtime = "nodejs";
-// Give a single step (download + extract, or the Claude call) room to finish.
+// Give a single step (download + extract, or the AI call) room to finish.
 export const maxDuration = 60;
 
 // In production, Inngest signs requests with INNGEST_SIGNING_KEY and the SDK

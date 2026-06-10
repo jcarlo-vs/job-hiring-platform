@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *                     nothing to claim and exits, so re-runs never double-write.
  *  2. load          - read the application + its job's requirements.
  *  3. extract-resume- download the snapshotted resume and pull out its text.
- *  4. screen        - call Claude for the structured assessment.
+ *  4. screen        - call the AI for the structured assessment.
  *  5. persist       - write results, set DONE, advance APPLIED -> SCREENED.
  *
  * Retries (3) cover transient failures (rate limits, blips). A NonRetriableError
@@ -99,7 +99,7 @@ export const screenApplication = inngest.createFunction(
       }
     });
 
-    // 4. Screen with Claude (structured output).
+    // 4. Screen with the AI (structured output).
     const result = await step.run("screen", async () =>
       screenResume({
         jobTitle: context.job.title,

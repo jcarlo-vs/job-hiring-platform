@@ -1,9 +1,10 @@
-import type { Database } from "@/lib/database.types";
+import { Constants, type Database } from "@/lib/database.types";
 
 export type Job = Database["public"]["Tables"]["jobs"]["Row"];
 export type EmploymentType = Database["public"]["Enums"]["employment_type"];
 export type WorkMode = Database["public"]["Enums"]["work_mode"];
 export type SalaryPeriod = Database["public"]["Enums"]["salary_period"];
+export type JobCategory = Database["public"]["Enums"]["job_category"];
 
 export const PAGE_SIZE = 9;
 
@@ -31,6 +32,31 @@ export const SALARY_PERIOD_SUFFIX: Record<SalaryPeriod, string> = {
   MONTHLY: "/mo",
   ANNUAL: "/yr",
 };
+
+export const JOB_CATEGORY_LABELS: Record<JobCategory, string> = {
+  SOFTWARE_ENGINEERING: "Software Engineering",
+  DATA_AI: "Data & AI",
+  DESIGN: "Design",
+  PRODUCT: "Product",
+  MARKETING: "Marketing",
+  SALES: "Sales",
+  FINANCE_ACCOUNTING: "Finance & Accounting",
+  OPERATIONS: "Operations",
+  CUSTOMER_SUPPORT: "Customer Support",
+  HEALTHCARE: "Healthcare",
+  EDUCATION: "Education",
+  ENGINEERING_TRADES: "Engineering & Trades",
+  LEGAL: "Legal",
+  WRITING_CONTENT: "Writing & Content",
+  OTHER: "Other",
+};
+
+/** Narrow an arbitrary string (e.g. a URL param) to a valid job category. */
+export function isValidCategory(value: string): value is JobCategory {
+  return (Constants.public.Enums.job_category as readonly string[]).includes(
+    value,
+  );
+}
 
 export function isExpired(job: Pick<Job, "expires_at">): boolean {
   return !!job.expires_at && new Date(job.expires_at).getTime() < Date.now();

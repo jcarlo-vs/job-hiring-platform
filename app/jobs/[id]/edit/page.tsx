@@ -52,9 +52,11 @@ export default async function EditJobPage({
             salaryPeriod: job.salary_period,
             employmentType: job.employment_type,
             workMode: job.work_mode,
+            category: job.category,
             expiresAt: job.expires_at ? job.expires_at.slice(0, 10) : undefined,
           }}
           submitLabel="Save changes"
+          cancelHref={`/jobs/${job.id}`}
         />
       </div>
     </div>

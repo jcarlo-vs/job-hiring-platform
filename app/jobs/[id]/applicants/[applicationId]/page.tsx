@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BackButton } from "@/components/ui/back-button";
 import {
   RECOMMENDATION_BADGE_CLASS,
   RECOMMENDATION_LABELS,
@@ -87,12 +87,7 @@ export default async function CandidatePage({
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <Link
-        href={`/jobs/${jobId}/applicants`}
-        className="text-muted text-sm hover:underline"
-      >
-        &larr; All applicants
-      </Link>
+      <BackButton href={`/jobs/${jobId}/applicants`} label="All applicants" />
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
         <span className="border-border rounded-full border px-3 py-1 text-sm">

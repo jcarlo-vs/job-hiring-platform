@@ -1,7 +1,12 @@
 import Link from "next/link";
 
+import { Select } from "@/components/ui/select";
 import { Constants } from "@/lib/database.types";
-import { EMPLOYMENT_TYPE_LABELS, WORK_MODE_LABELS } from "@/lib/jobs";
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  JOB_CATEGORY_LABELS,
+  WORK_MODE_LABELS,
+} from "@/lib/jobs";
 
 type Props = {
   q?: string;
@@ -9,22 +14,48 @@ type Props = {
   employmentType?: string;
   workMode?: string;
   salaryMin?: string;
+  category?: string;
 };
 
+const typeOptions = [
+  { value: "", label: "Any type" },
+  ...Constants.public.Enums.employment_type.map((t) => ({
+    value: t,
+    label: EMPLOYMENT_TYPE_LABELS[t],
+  })),
+];
+
+const modeOptions = [
+  { value: "", label: "Any mode" },
+  ...Constants.public.Enums.work_mode.map((m) => ({
+    value: m,
+    label: WORK_MODE_LABELS[m],
+  })),
+];
+
+const categoryOptions = [
+  { value: "", label: "Any category" },
+  ...Constants.public.Enums.job_category.map((c) => ({
+    value: c,
+    label: JOB_CATEGORY_LABELS[c],
+  })),
+];
+
 // A plain GET form: submitting sets the URL query params, so search/filtering
-// works without client JavaScript and produces shareable URLs.
+// produces shareable URLs. Each Select writes its value to a hidden input.
 export function JobFilters({
   q,
   location,
   employmentType,
   workMode,
   salaryMin,
+  category,
 }: Props) {
   return (
     <form
       method="get"
       action="/jobs"
-      className="border-border grid gap-3 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-6"
+      className="border-border grid gap-3 rounded-2xl border-2 bg-white p-4 sm:grid-cols-2 lg:grid-cols-7"
     >
       <input
         name="q"
@@ -38,32 +69,24 @@ export function JobFilters({
         placeholder="Location"
         className="field-input"
       />
-      <select
+      <Select
         name="employment_type"
         defaultValue={employmentType ?? ""}
-        className="field-input"
-        aria-label="Employment type"
-      >
-        <option value="">Any type</option>
-        {Constants.public.Enums.employment_type.map((t) => (
-          <option key={t} value={t}>
-            {EMPLOYMENT_TYPE_LABELS[t]}
-          </option>
-        ))}
-      </select>
-      <select
+        options={typeOptions}
+        ariaLabel="Employment type"
+      />
+      <Select
         name="work_mode"
         defaultValue={workMode ?? ""}
-        className="field-input"
-        aria-label="Work mode"
-      >
-        <option value="">Any mode</option>
-        {Constants.public.Enums.work_mode.map((m) => (
-          <option key={m} value={m}>
-            {WORK_MODE_LABELS[m]}
-          </option>
-        ))}
-      </select>
+        options={modeOptions}
+        ariaLabel="Work mode"
+      />
+      <Select
+        name="category"
+        defaultValue={category ?? ""}
+        options={categoryOptions}
+        ariaLabel="Category"
+      />
       <input
         name="salary_min"
         type="number"
@@ -72,7 +95,7 @@ export function JobFilters({
         placeholder="Min salary"
         className="field-input"
       />
-      <div className="flex gap-3 sm:col-span-2 lg:col-span-6">
+      <div className="flex gap-3 sm:col-span-2 lg:col-span-7">
         <button type="submit" className="btn-primary">
           Search
         </button>

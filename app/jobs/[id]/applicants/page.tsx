@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BackButton } from "@/components/ui/back-button";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -60,16 +61,28 @@ export default async function ApplicantsPage({
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <Link href="/dashboard" className="text-muted text-sm hover:underline">
-        &larr; Dashboard
-      </Link>
-      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+      <BackButton href="/dashboard" label="Dashboard" />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{job.title}</h1>
         <Link
           href={`/jobs/${jobId}`}
-          className="text-primary text-sm hover:underline"
+          className="border-border hover:border-primary inline-flex items-center gap-1.5 rounded-full border-2 bg-white px-4 py-1.5 text-sm font-bold transition-colors"
         >
           View posting
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden="true"
+            className="h-4 w-4"
+          >
+            <path
+              d="M5 15L15 5M15 5H8M15 5v7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </Link>
       </div>
       <p className="text-muted mt-1 text-sm">

@@ -1,12 +1,15 @@
 import Link from "next/link";
 
-import { closeJob, reopenJob } from "@/app/jobs/actions";
+import { reopenJob } from "@/app/jobs/actions";
 import { ApplyButton } from "@/components/apply-button";
+import { SalaryTag } from "@/components/salary-tag";
+import { BackButton } from "@/components/ui/back-button";
+import { CloseJobButton } from "@/components/ui/close-job-button";
 import {
   EMPLOYMENT_TYPE_LABELS,
+  JOB_CATEGORY_LABELS,
   WORK_MODE_LABELS,
   formatDate,
-  formatSalary,
   isExpired,
 } from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
@@ -60,22 +63,25 @@ export default async function JobDetailPage({
     alreadyApplied = !!existing;
   }
 
-  const salary = formatSalary(job.salary_min, job.salary_max, job.salary_period);
-
   return (
     <article className="mx-auto max-w-3xl px-6 py-10">
-      <Link href="/jobs" className="text-muted text-sm hover:underline">
-        &larr; All jobs
-      </Link>
+      <BackButton href="/jobs" label="All jobs" />
 
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">
         {job.title}
       </h1>
-      <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <div className="text-muted mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span className="text-primary font-semibold">
+          {JOB_CATEGORY_LABELS[job.category]}
+        </span>
         {job.location && <span>{job.location}</span>}
         <span>{EMPLOYMENT_TYPE_LABELS[job.employment_type]}</span>
         <span>{WORK_MODE_LABELS[job.work_mode]}</span>
-        {salary && <span>{salary}</span>}
+        <SalaryTag
+          min={job.salary_min}
+          max={job.salary_max}
+          period={job.salary_period}
+        />
         <span>Posted {formatDate(job.created_at)}</span>
       </div>
 
@@ -92,11 +98,7 @@ export default async function JobDetailPage({
             Edit
           </Link>
           {job.status === "OPEN" ? (
-            <form action={closeJob.bind(null, job.id)}>
-              <button type="submit" className="text-primary hover:underline">
-                Close
-              </button>
-            </form>
+            <CloseJobButton jobId={job.id} />
           ) : (
             <form action={reopenJob.bind(null, job.id)}>
               <button type="submit" className="text-primary hover:underline">

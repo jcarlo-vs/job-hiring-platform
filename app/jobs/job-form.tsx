@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import type { JobFormState } from "@/app/jobs/actions";
+import { Select } from "@/components/ui/select";
 import { Constants } from "@/lib/database.types";
 import {
   EMPLOYMENT_TYPE_LABELS,
+  JOB_CATEGORY_LABELS,
   SALARY_PERIOD_LABELS,
   WORK_MODE_LABELS,
 } from "@/lib/jobs";
@@ -20,17 +23,37 @@ type Defaults = {
   salaryPeriod?: string;
   employmentType?: string;
   workMode?: string;
+  category?: string;
   expiresAt?: string;
 };
+
+const salaryPeriodOptions = Constants.public.Enums.salary_period.map((p) => ({
+  value: p,
+  label: SALARY_PERIOD_LABELS[p],
+}));
+const employmentTypeOptions = Constants.public.Enums.employment_type.map((t) => ({
+  value: t,
+  label: EMPLOYMENT_TYPE_LABELS[t],
+}));
+const workModeOptions = Constants.public.Enums.work_mode.map((m) => ({
+  value: m,
+  label: WORK_MODE_LABELS[m],
+}));
+const categoryOptions = Constants.public.Enums.job_category.map((c) => ({
+  value: c,
+  label: JOB_CATEGORY_LABELS[c],
+}));
 
 export function JobForm({
   action,
   defaults,
   submitLabel,
+  cancelHref,
 }: {
   action: (state: JobFormState, formData: FormData) => Promise<JobFormState>;
   defaults: Defaults;
   submitLabel: string;
+  cancelHref?: string;
 }) {
   const [state, formAction, pending] = useActionState<JobFormState, FormData>(
     action,
@@ -50,6 +73,7 @@ export function JobForm({
           name="title"
           required
           defaultValue={defaults.title}
+          placeholder="e.g. Senior Frontend Engineer (React)"
           className="field-input"
         />
       </div>
@@ -64,7 +88,10 @@ export function JobForm({
           required
           rows={5}
           defaultValue={defaults.description}
-          className="field-input"
+          placeholder={`What is the role, who is your team, and what will they work on day to day?
+
+e.g. We're a small product team building a hiring platform. You'll own the candidate-facing experience end to end, ship features weekly, and work closely with design and backend.`}
+          className="field-input min-h-[9rem]"
         />
       </div>
 
@@ -78,7 +105,14 @@ export function JobForm({
           required
           rows={5}
           defaultValue={defaults.requirements}
-          className="field-input"
+          placeholder={`List the must-have skills, experience, and qualifications. The clearer these are, the sharper the AI screening.
+
+e.g.
+- 3+ years building web apps with React and TypeScript
+- Comfortable with REST APIs and a SQL database like Postgres
+- Strong communication in a remote, async team
+- Nice to have: Next.js, Tailwind, CI/CD`}
+          className="field-input min-h-[13rem]"
         />
         <p className="text-muted mt-1 text-xs">
           These are sent to the AI screener to match candidates.
@@ -101,7 +135,7 @@ export function JobForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="salaryMin" className="field-label">
-            Salary min (USD)
+            Salary min (USD, optional)
           </label>
           <input
             id="salaryMin"
@@ -114,7 +148,7 @@ export function JobForm({
         </div>
         <div>
           <label htmlFor="salaryMax" className="field-label">
-            Salary max (USD)
+            Salary max (USD, optional)
           </label>
           <input
             id="salaryMax"
@@ -128,60 +162,49 @@ export function JobForm({
       </div>
 
       <div>
-        <label htmlFor="salaryPeriod" className="field-label">
-          Pay period
-        </label>
-        <select
-          id="salaryPeriod"
+        <span className="field-label">Pay period</span>
+        <Select
           name="salaryPeriod"
           defaultValue={defaults.salaryPeriod ?? "ANNUAL"}
-          className="field-input"
-        >
-          {Constants.public.Enums.salary_period.map((p) => (
-            <option key={p} value={p}>
-              {SALARY_PERIOD_LABELS[p]}
-            </option>
-          ))}
-        </select>
+          options={salaryPeriodOptions}
+          ariaLabel="Pay period"
+        />
         <p className="text-muted mt-1 text-xs">
           How the pay above is quoted (e.g. $10/hr or $120,000/yr).
         </p>
       </div>
 
+      <div>
+        <span className="field-label">Category</span>
+        <Select
+          name="category"
+          defaultValue={defaults.category ?? "OTHER"}
+          options={categoryOptions}
+          ariaLabel="Category"
+        />
+        <p className="text-muted mt-1 text-xs">
+          Helps the right job seekers discover this role.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="employmentType" className="field-label">
-            Employment type
-          </label>
-          <select
-            id="employmentType"
+          <span className="field-label">Employment type</span>
+          <Select
             name="employmentType"
             defaultValue={defaults.employmentType ?? "FULL_TIME"}
-            className="field-input"
-          >
-            {Constants.public.Enums.employment_type.map((t) => (
-              <option key={t} value={t}>
-                {EMPLOYMENT_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+            options={employmentTypeOptions}
+            ariaLabel="Employment type"
+          />
         </div>
         <div>
-          <label htmlFor="workMode" className="field-label">
-            Work mode
-          </label>
-          <select
-            id="workMode"
+          <span className="field-label">Work mode</span>
+          <Select
             name="workMode"
             defaultValue={defaults.workMode ?? "REMOTE"}
-            className="field-input"
-          >
-            {Constants.public.Enums.work_mode.map((m) => (
-              <option key={m} value={m}>
-                {WORK_MODE_LABELS[m]}
-              </option>
-            ))}
-          </select>
+            options={workModeOptions}
+            ariaLabel="Work mode"
+          />
         </div>
       </div>
 
@@ -202,9 +225,19 @@ export function JobForm({
         </p>
       </div>
 
-      <button type="submit" disabled={pending} className="btn-primary">
-        {pending ? "Saving..." : submitLabel}
-      </button>
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={pending} className="btn-primary">
+          {pending ? "Saving..." : submitLabel}
+        </button>
+        {cancelHref && (
+          <Link
+            href={cancelHref}
+            className="border-border hover:border-primary rounded-full border-2 px-5 py-2.5 text-sm font-bold transition-colors"
+          >
+            Cancel
+          </Link>
+        )}
+      </div>
     </form>
   );
 }

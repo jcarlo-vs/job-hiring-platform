@@ -148,6 +148,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          category: Database["public"]["Enums"]["job_category"]
           created_at: string
           description: string
           employer_id: string
@@ -164,6 +165,7 @@ export type Database = {
           work_mode: Database["public"]["Enums"]["work_mode"]
         }
         Insert: {
+          category?: Database["public"]["Enums"]["job_category"]
           created_at?: string
           description: string
           employer_id: string
@@ -180,6 +182,7 @@ export type Database = {
           work_mode: Database["public"]["Enums"]["work_mode"]
         }
         Update: {
+          category?: Database["public"]["Enums"]["job_category"]
           created_at?: string
           description?: string
           employer_id?: string
@@ -211,7 +214,9 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          onboarded_at: string | null
           phone: string | null
+          preferred_categories: Database["public"]["Enums"]["job_category"][]
           resume_filename: string | null
           resume_path: string | null
           resume_uploaded_at: string | null
@@ -222,7 +227,9 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          onboarded_at?: string | null
           phone?: string | null
+          preferred_categories?: Database["public"]["Enums"]["job_category"][]
           resume_filename?: string | null
           resume_path?: string | null
           resume_uploaded_at?: string | null
@@ -233,7 +240,9 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          onboarded_at?: string | null
           phone?: string | null
+          preferred_categories?: Database["public"]["Enums"]["job_category"][]
           resume_filename?: string | null
           resume_path?: string | null
           resume_uploaded_at?: string | null
@@ -258,6 +267,22 @@ export type Database = {
         | "OFFER"
         | "REJECTED"
       employment_type: "FULL_TIME" | "PART_TIME" | "CONTRACT"
+      job_category:
+        | "SOFTWARE_ENGINEERING"
+        | "DATA_AI"
+        | "DESIGN"
+        | "PRODUCT"
+        | "MARKETING"
+        | "SALES"
+        | "FINANCE_ACCOUNTING"
+        | "OPERATIONS"
+        | "CUSTOMER_SUPPORT"
+        | "HEALTHCARE"
+        | "EDUCATION"
+        | "ENGINEERING_TRADES"
+        | "LEGAL"
+        | "WRITING_CONTENT"
+        | "OTHER"
       job_status: "OPEN" | "CLOSED"
       salary_period: "HOURLY" | "MONTHLY" | "ANNUAL"
       screening_status: "PENDING" | "PROCESSING" | "DONE" | "ERROR"
@@ -400,6 +425,23 @@ export const Constants = {
         "REJECTED",
       ],
       employment_type: ["FULL_TIME", "PART_TIME", "CONTRACT"],
+      job_category: [
+        "SOFTWARE_ENGINEERING",
+        "DATA_AI",
+        "DESIGN",
+        "PRODUCT",
+        "MARKETING",
+        "SALES",
+        "FINANCE_ACCOUNTING",
+        "OPERATIONS",
+        "CUSTOMER_SUPPORT",
+        "HEALTHCARE",
+        "EDUCATION",
+        "ENGINEERING_TRADES",
+        "LEGAL",
+        "WRITING_CONTENT",
+        "OTHER",
+      ],
       job_status: ["OPEN", "CLOSED"],
       salary_period: ["HOURLY", "MONTHLY", "ANNUAL"],
       screening_status: ["PENDING", "PROCESSING", "DONE", "ERROR"],

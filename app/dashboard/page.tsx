@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { closeJob, reopenJob } from "@/app/jobs/actions";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import { ResumeManager } from "@/components/resume-manager";
 import {
   PIPELINE_STAGES,
@@ -9,10 +10,21 @@ import {
   type ApplicationStage,
 } from "@/lib/applications";
 import { getProfile } from "@/lib/auth";
-import { formatDate, isExpired, type Job } from "@/lib/jobs";
+import { Constants } from "@/lib/database.types";
+import {
+  JOB_CATEGORY_LABELS,
+  formatDate,
+  isExpired,
+  type Job,
+} from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
 
 type StageCounts = { total: number; byStage: Partial<Record<ApplicationStage, number>> };
+
+const categoryOptions = Constants.public.Enums.job_category.map((c) => ({
+  value: c,
+  label: JOB_CATEGORY_LABELS[c],
+}));
 
 export default async function DashboardPage() {
   const profile = await getProfile();
@@ -96,8 +108,12 @@ export default async function DashboardPage() {
     );
   }
 
+  const needsOnboarding = profile.onboarded_at == null;
+  const prefs = profile.preferred_categories ?? [];
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
+      {needsOnboarding && <OnboardingModal categories={categoryOptions} />}
       <p className="text-muted text-sm">Your dashboard</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight">
         Welcome, {firstName}
@@ -117,6 +133,31 @@ export default async function DashboardPage() {
             className="text-primary mt-4 inline-block text-sm hover:underline"
           >
             View my applications
+          </Link>
+        </section>
+        <section className="border-border rounded-lg border p-6">
+          <h2 className="font-medium">Job interests</h2>
+          {prefs.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {prefs.map((c) => (
+                <span
+                  key={c}
+                  className="border-border rounded-full border px-2 py-0.5 text-xs"
+                >
+                  {JOB_CATEGORY_LABELS[c]}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted mt-2 text-sm">
+              You have not set any interests yet.
+            </p>
+          )}
+          <Link
+            href="/settings/preferences"
+            className="text-primary mt-4 inline-block text-sm hover:underline"
+          >
+            Edit interests
           </Link>
         </section>
       </div>
