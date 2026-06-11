@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 import { Select } from "@/components/ui/select";
 import { Constants } from "@/lib/database.types";
@@ -41,8 +45,18 @@ const categoryOptions = [
   })),
 ];
 
-// A plain GET form: submitting sets the URL query params, so search/filtering
-// produces shareable URLs. Each Select writes its value to a hidden input.
+const FIELDS = [
+  "q",
+  "location",
+  "employment_type",
+  "work_mode",
+  "category",
+  "salary_min",
+] as const;
+
+// A GET form (so it works with no JS + produces shareable URLs), but JS upgrades
+// the submit to a fast client-side navigation with a pending state instead of a
+// full-page reload.
 export function JobFilters({
   q,
   location,
@@ -51,10 +65,28 @@ export function JobFilters({
   salaryMin,
   category,
 }: Props) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const params = new URLSearchParams();
+    for (const key of FIELDS) {
+      const value = data.get(key);
+      if (typeof value === "string" && value.trim() !== "") {
+        params.set(key, value.trim());
+      }
+    }
+    const qs = params.toString();
+    startTransition(() => router.push(qs ? `/jobs?${qs}` : "/jobs"));
+  }
+
   return (
     <form
       method="get"
       action="/jobs"
+      onSubmit={onSubmit}
       className="border-border grid gap-3 rounded-2xl border-2 bg-white p-4 sm:grid-cols-2 lg:grid-cols-7"
     >
       <input
@@ -95,9 +127,9 @@ export function JobFilters({
         placeholder="Min salary"
         className="field-input"
       />
-      <div className="flex gap-3 sm:col-span-2 lg:col-span-7">
-        <button type="submit" className="btn-primary">
-          Search
+      <div className="flex items-center gap-3 sm:col-span-2 lg:col-span-7">
+        <button type="submit" disabled={pending} className="btn-primary">
+          {pending ? "Searching..." : "Search"}
         </button>
         <Link
           href="/jobs"

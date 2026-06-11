@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
+import { Suspense } from "react";
 
+import { NavProgress } from "@/components/nav-progress";
 import { SiteHeader } from "@/components/site-header";
 
 import "./globals.css";
@@ -25,6 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${appSans.variable} h-full antialiased`}>
       <body className="bg-background text-foreground flex min-h-full flex-col">
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-border border-t">
