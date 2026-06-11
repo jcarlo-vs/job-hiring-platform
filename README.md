@@ -7,7 +7,7 @@ A full-stack job board and applicant tracking system. Applicants apply with a re
 - **Live demo:** https://talent-screen.vercel.app
 - **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Supabase - Inngest - Anthropic - Resend
 
-> Portfolio project. Build log in [PROGRESS.md](./PROGRESS.md); the full decision log (with reasons) is in [DECISIONS.md](./DECISIONS.md).
+> Portfolio project. The end-to-end flow (and how Inngest + Resend fit in) is documented in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ### Demo accounts
 
