@@ -57,7 +57,10 @@
   margin: 0;
 }
 
-.page a {
+/* :where() keeps this link reset at a low specificity so it still overrides the
+   UA blue/underline (author origin beats UA) but loses to button/link classes
+   like .primaryBtn or .textLink that set their own color. */
+:where(.page) a {
   color: inherit;
   text-decoration: none;
 }

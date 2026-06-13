@@ -75,7 +75,7 @@ const testimonials = [
       "We stopped drowning in resumes. The shortlist is ready before I have finished my coffee, and I can see exactly why.",
     name: "Priya Shah",
     role: "Head of Talent, Lumen Labs",
-    img: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=600&q=80&auto=format&fit=crop",
+    img: "/people/priya.jpg",
     initials: "PS",
   },
   {
@@ -83,7 +83,7 @@ const testimonials = [
       "I finally know where I stand instead of being ghosted. I saw my match score before I even applied.",
     name: "Daniel Reyes",
     role: "Product Designer",
-    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80&auto=format&fit=crop",
+    img: "/people/daniel.jpg",
     initials: "DR",
   },
   {
@@ -91,7 +91,7 @@ const testimonials = [
       "It ranks and explains, but I make every call. That is the part I trust.",
     name: "Marcus Webb",
     role: "Engineering Director, Atlas",
-    img: "",
+    img: "/people/marcus.jpg",
     initials: "MW",
   },
 ];
