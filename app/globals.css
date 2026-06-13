@@ -1,13 +1,17 @@
 @import "tailwindcss";
 
-/* Playful Pop theme */
+/* Trust theme - warm off-white paper, deep teal, human and credible. */
 :root {
-  --background: #fffaf3;
-  --foreground: #2b2440;
-  --muted: #5b5470;
-  --border: #ece7f5;
-  --primary: #9b5de5;
+  --background: #fcfbf8;
+  --foreground: #1f2330;
+  --muted: #5a5f6e;
+  --border: #e8e4da;
+  --primary: #0e7c7b;
   --primary-foreground: #ffffff;
+  /* Body alias so page-level CSS modules that reference --font-body resolve to
+     the global sans. The display font (--font-display, Bricolage Grotesque) is
+     set on <html> by the root layout. */
+  --font-body: var(--font-app-sans);
 }
 
 @theme inline {
@@ -18,7 +22,6 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --font-sans: var(--font-app-sans);
-  /* rounder corners for the playful feel */
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
@@ -28,8 +31,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family:
-    var(--font-app-sans), ui-rounded, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-app-sans), "Segoe UI", system-ui, sans-serif;
 }
 
 @layer base {
@@ -66,7 +68,7 @@ body {
   }
   .btn-primary {
     @apply text-primary-foreground bg-primary rounded-full px-5 py-2.5 text-sm font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60;
-    box-shadow: 0 4px 0 #6f3fb0;
+    box-shadow: 0 6px 16px -6px rgba(10, 79, 78, 0.5);
   }
   .form-error {
     @apply rounded-xl border-2 border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700;

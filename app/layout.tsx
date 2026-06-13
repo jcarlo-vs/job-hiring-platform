@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Albert_Sans, Bricolage_Grotesque } from "next/font/google";
 import { Suspense } from "react";
 
+import { ChromeGate } from "@/components/chrome-gate";
 import { NavProgress } from "@/components/nav-progress";
 import { SiteHeader } from "@/components/site-header";
 
 import "./globals.css";
 
-const appSans = Nunito({
+const appSans = Albert_Sans({
   variable: "--font-app-sans",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  display: "swap",
+});
+const appDisplay = Bricolage_Grotesque({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -25,26 +31,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${appSans.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${appSans.variable} ${appDisplay.variable} h-full antialiased`}
+    >
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <footer className="border-border border-t">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-extrabold">
-                Talent<span className="text-primary">Screen</span>
-              </p>
-              <p className="text-muted mt-1 text-sm">
-                AI-powered screening. Human-powered decisions.
-              </p>
-            </div>
-            <p className="text-muted text-xs">&copy; 2026 TalentScreen</p>
-          </div>
-        </footer>
+        <ChromeGate
+          header={<SiteHeader />}
+          footer={
+            <footer className="border-border border-t">
+              <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-extrabold">
+                    Talent<span className="text-primary">Screen</span>
+                  </p>
+                  <p className="text-muted mt-1 text-sm">
+                    AI-powered screening. Human-powered decisions.
+                  </p>
+                </div>
+                <p className="text-muted text-xs">&copy; 2026 TalentScreen</p>
+              </div>
+            </footer>
+          }
+        >
+          {children}
+        </ChromeGate>
       </body>
     </html>
   );
