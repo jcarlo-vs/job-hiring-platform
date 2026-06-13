@@ -1,8 +1,12 @@
 name: supabase-keepalive
 
-# Pings the deployed /api/health route (which runs a real DB query) so
-# Supabase's free-tier inactivity pause (~7 days) is reset. Runs twice a week
+# Runs a real Postgres query against Supabase (via PostgREST) twice a week so
+# the free-tier inactivity pause (~7 days) is reset. The schedule runs Mon & Thu
 # to absorb GitHub's best-effort cron delays.
+#
+# Hits Supabase directly rather than the app's /api/health route so the keepalive
+# keeps working even when the Vercel deployment is down or redeployed at a new URL.
+# SUPABASE_ANON_KEY is the publishable (anon) key - RLS still governs all access.
 #
 # Uses NO third-party actions (only preinstalled `curl` + `gh`) so it works
 # regardless of the account's Actions policy. The second step reimplements the
@@ -21,11 +25,15 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping health endpoint (runs a DB query)
+      - name: Ping Supabase (runs a real DB query via PostgREST)
+        env:
+          SUPABASE_URL: https://uuxctnyrynwmnwaeopqw.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           curl --fail-with-body -sS \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://job-hiring-platform-eight.vercel.app/api/health"
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/health_check?select=id&limit=1"
 
       - name: Prevent 60-day scheduled-workflow auto-disable
         if: ${{ github.event_name == 'schedule' }}
