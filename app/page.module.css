@@ -16,10 +16,12 @@
   --amber-soft: #f8eed9;
   --white: #ffffff;
 
-  --shadow-sm: 0 1px 2px rgba(31, 35, 48, 0.06), 0 1px 1px rgba(31, 35, 48, 0.04);
-  --shadow-md: 0 8px 24px -10px rgba(31, 35, 48, 0.18),
-    0 2px 6px rgba(31, 35, 48, 0.06);
-  --shadow-lg: 0 24px 60px -24px rgba(14, 124, 123, 0.28),
+  --shadow-sm:
+    0 1px 2px rgba(31, 35, 48, 0.06), 0 1px 1px rgba(31, 35, 48, 0.04);
+  --shadow-md:
+    0 8px 24px -10px rgba(31, 35, 48, 0.18), 0 2px 6px rgba(31, 35, 48, 0.06);
+  --shadow-lg:
+    0 24px 60px -24px rgba(14, 124, 123, 0.28),
     0 8px 24px -12px rgba(31, 35, 48, 0.16);
 
   --radius: 16px;
@@ -34,6 +36,7 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.01em;
+  overflow-x: clip;
 }
 
 .page *,
@@ -59,7 +62,7 @@
 
 /* :where() keeps this link reset at a low specificity so it still overrides the
    UA blue/underline (author origin beats UA) but loses to button/link classes
-   like .primaryBtn or .textLink that set their own color. */
+   like .primaryBtn that set their own color. */
 :where(.page) a {
   color: inherit;
   text-decoration: none;
@@ -167,7 +170,10 @@
   border-radius: 11px;
   border: 1px solid var(--teal-deep);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 .primaryBtn {
   padding: 9px 16px;
@@ -198,7 +204,10 @@
   border: 1px solid var(--hairline);
   border-radius: 11px;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 .ghostBtn {
   padding: 9px 16px;
@@ -220,11 +229,29 @@
 
 /* ---------- HERO ---------- */
 .hero {
+  position: relative;
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 56px 24px 24px;
+  padding: 64px 24px 32px;
+}
+.heroGlow {
+  position: absolute;
+  top: -180px;
+  right: 4%;
+  width: min(560px, 72%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(14, 124, 123, 0.12) 0%,
+    rgba(14, 124, 123, 0) 70%
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 .heroGrid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr;
   gap: 44px;
@@ -252,7 +279,7 @@
 }
 .h1 {
   margin-top: 20px;
-  font-size: clamp(2.3rem, 6vw, 3.6rem);
+  font-size: clamp(2.4rem, 6vw, 3.8rem);
   font-weight: 700;
 }
 .h1Accent {
@@ -420,77 +447,6 @@
   flex-shrink: 0;
 }
 
-/* ---------- LOGO CLOUD ---------- */
-.logos {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: 52px 24px 8px;
-  text-align: center;
-}
-.logosLabel {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--slate);
-}
-.logosRow {
-  margin-top: 22px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 18px 40px;
-}
-.logo {
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 1.12rem;
-  letter-spacing: -0.02em;
-  color: #9a9486;
-  opacity: 0.85;
-  transition: color 0.2s ease, opacity 0.2s ease;
-}
-.logo:hover {
-  color: var(--slate);
-  opacity: 1;
-}
-
-/* ---------- STATS BAND ---------- */
-.statsBand {
-  max-width: var(--maxw);
-  margin: 44px auto 0;
-  padding: 0 24px;
-}
-.statsInner {
-  background: var(--teal-deep);
-  background: linear-gradient(135deg, var(--teal-deep) 0%, #084e4d 100%);
-  border-radius: var(--radius-lg);
-  padding: 34px 24px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  box-shadow: var(--shadow-md);
-}
-.stat {
-  text-align: center;
-  color: var(--white);
-}
-.statValue {
-  display: block;
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 700;
-  font-size: clamp(1.7rem, 4vw, 2.3rem);
-  letter-spacing: -0.03em;
-  color: #fff;
-}
-.statLabel {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.88rem;
-  color: rgba(255, 255, 255, 0.78);
-}
-
 /* ---------- GENERIC SECTION ---------- */
 .section {
   max-width: var(--maxw);
@@ -499,7 +455,7 @@
 }
 .sectionHead {
   max-width: 46rem;
-  margin-bottom: 40px;
+  margin-bottom: 44px;
 }
 .kicker {
   display: inline-block;
@@ -521,249 +477,73 @@
   max-width: 38em;
 }
 
-/* ---------- TESTIMONIALS ---------- */
-.quotes {
+/* ---------- HOW IT WORKS (steps + ranked shortlist) ---------- */
+.howGrid {
   display: grid;
   grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.step {
+  position: relative;
+  display: flex;
   gap: 18px;
+  padding-bottom: 30px;
 }
-.quote {
-  margin: 0;
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  padding: 26px 24px 22px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.step:last-child {
+  padding-bottom: 0;
 }
-.quote:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+/* vertical connector running through the number badges */
+.step::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 42px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--hairline);
 }
-.quote blockquote {
-  margin: 0;
-  flex: 1;
+.step:last-child::before {
+  display: none;
 }
-.iQuote {
-  color: var(--teal-soft);
-  margin-bottom: 6px;
-}
-.quote blockquote p {
-  font-size: 1.05rem;
-  line-height: 1.55;
-  color: var(--ink);
-  font-weight: 500;
-}
-.quoteWho {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--hairline);
-}
-.quoteAvatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--hairline);
-  flex-shrink: 0;
-}
-.quoteInitials {
+.stepNum {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--teal-soft);
-  color: var(--teal-deep);
-  font-weight: 700;
-  font-size: 0.95rem;
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
-}
-.quoteName {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-}
-.quoteName strong {
-  font-size: 0.95rem;
-}
-.quoteName span {
-  font-size: 0.85rem;
-  color: var(--slate);
-}
-
-/* ---------- TWO AUDIENCES ---------- */
-.audiences {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 22px;
-}
-.audience {
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.audience:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-.audiencePhoto {
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  background: var(--surface);
-}
-.audiencePhoto img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.audienceBody {
-  padding: 26px 26px 28px;
-}
-.audienceTag {
-  display: inline-block;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--teal-deep);
-  background: var(--teal-soft);
-  padding: 5px 11px;
-  border-radius: 999px;
-}
-.audienceTagAlt {
-  color: #8a5a08;
-  background: var(--amber-soft);
-}
-.audienceBody h3 {
-  margin-top: 16px;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-.audienceBody p {
-  margin-top: 12px;
-  color: var(--slate);
-  font-size: 1rem;
-}
-.textLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 18px;
-  font-weight: 600;
-  color: var(--teal-deep);
-  transition: gap 0.2s ease;
-}
-.textLink:hover {
-  gap: 10px;
-}
-.iArrow {
-  transition: transform 0.2s ease;
-}
-
-/* job card panel inside seeker audience */
-.audiencePanel {
-  padding: 4px 26px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.jobCard {
-  background: var(--bg);
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  padding: 14px 15px;
-  box-shadow: var(--shadow-sm);
-}
-.jobCardMuted {
-  opacity: 0.72;
-}
-.jobTop {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-.jobLogo {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--ink);
+  border-radius: 11px;
+  background: var(--teal-deep);
   color: var(--white);
   font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;
-  font-size: 0.95rem;
-  flex-shrink: 0;
+  font-size: 1.05rem;
+  box-shadow: 0 0 0 5px var(--bg);
 }
-.jobMeta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.stepBody {
+  padding-top: 3px;
 }
-.jobMeta strong {
-  font-size: 0.92rem;
-  line-height: 1.2;
-}
-.jobMeta span {
-  font-size: 0.8rem;
-  color: var(--slate);
-}
-.jobScore {
-  margin-left: auto;
+.stepBody h3 {
+  font-size: 1.18rem;
   font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--teal-deep);
-  background: var(--teal-soft);
-  padding: 3px 9px;
-  border-radius: 8px;
 }
-.jobBar {
-  margin-top: 11px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.jobBarFill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--teal), var(--teal-deep));
-}
-.jobTags {
-  margin-top: 11px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.jobTags span {
-  font-size: 0.76rem;
-  font-weight: 500;
+.stepBody p {
+  margin-top: 7px;
   color: var(--slate);
-  background: var(--surface);
-  padding: 3px 9px;
-  border-radius: 7px;
+  font-size: 0.97rem;
 }
 
-/* ---------- PRODUCT MOCK + FEATURES ---------- */
-.productWrap {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 32px;
-  align-items: start;
-}
+/* ranked-shortlist app panel */
 .appPanel {
   background: var(--white);
   border: 1px solid var(--hairline);
@@ -827,7 +607,9 @@
 }
 .candList .candidate {
   padding: 13px 16px;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 .candList .candidate:hover {
   border-color: rgba(14, 124, 123, 0.3);
@@ -956,91 +738,82 @@
   color: var(--teal-deep);
 }
 
-.featureList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.feature {
-  display: flex;
-  gap: 14px;
-  padding: 18px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  transition: background 0.18s ease, border-color 0.18s ease;
-}
-.feature:hover {
-  background: var(--white);
-  border-color: var(--hairline);
-  box-shadow: var(--shadow-sm);
-}
-.featureIcon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--teal-soft);
-  color: var(--teal-deep);
-  flex-shrink: 0;
-}
-.featureIcon .iCheck {
-  color: var(--teal-deep);
-}
-.feature h3 {
-  font-size: 1.12rem;
-  font-weight: 700;
-}
-.feature p {
-  margin-top: 6px;
-  font-size: 0.96rem;
-  color: var(--slate);
-}
-
-/* ---------- STEPS ---------- */
-.steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* ---------- TESTIMONIALS ---------- */
+.quotes {
   display: grid;
   grid-template-columns: 1fr;
   gap: 18px;
-  counter-reset: step;
 }
-.step {
-  position: relative;
+.quote {
+  margin: 0;
   background: var(--white);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
-  padding: 26px 24px 24px;
+  padding: 26px 24px 22px;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
-.step:hover {
+.quote:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
-.stepNum {
+.quote blockquote {
+  margin: 0;
+  flex: 1;
+}
+.iQuote {
+  color: var(--teal-soft);
+  margin-bottom: 6px;
+}
+.quote blockquote p {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink);
+  font-weight: 500;
+}
+.quoteWho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.quoteAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.quoteInitials {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--teal-deep);
-  color: var(--white);
-  font-family: var(--font-display), system-ui, sans-serif;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
   font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 16px;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }
-.step h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
+.quoteName {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
 }
-.step p {
-  margin-top: 9px;
+.quoteName strong {
+  font-size: 0.95rem;
+}
+.quoteName span {
+  font-size: 0.85rem;
   color: var(--slate);
-  font-size: 0.97rem;
 }
 
 /* ---------- FINAL CTA ---------- */
@@ -1072,7 +845,9 @@
   );
   pointer-events: none;
 }
-.ctaTitle {
+/* Scoped under .ctaInner so this beats the global `.page h2` color rule
+   (specificity 0,1,1) and renders white on the dark teal band. */
+.ctaInner .ctaTitle {
   font-size: clamp(1.9rem, 5vw, 2.8rem);
   font-weight: 700;
   color: #fff;
@@ -1148,7 +923,7 @@
 }
 .footerCols {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 26px;
 }
 .footerCol {
@@ -1198,7 +973,9 @@
   background: var(--teal-soft);
   padding: 7px 14px;
   border-radius: 999px;
-  transition: background 0.18s ease, transform 0.18s ease;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 .themesLink:hover {
   background: #d4e8e6;
@@ -1229,11 +1006,8 @@
   .quotes .quote:nth-child(3) {
     grid-column: 1 / -1;
   }
-  .steps {
-    grid-template-columns: repeat(3, 1fr);
-  }
   .footerInner {
-    grid-template-columns: 1.1fr 2fr;
+    grid-template-columns: 1.1fr 1.4fr;
   }
 }
 
@@ -1241,30 +1015,21 @@
   .navLinks {
     display: flex;
   }
-  .statsInner {
-    grid-template-columns: repeat(4, 1fr);
-  }
   .quotes {
     grid-template-columns: repeat(3, 1fr);
   }
   .quotes .quote:nth-child(3) {
     grid-column: auto;
   }
-  .audiences {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .audience {
-    flex-direction: column;
-  }
-  .productWrap {
-    grid-template-columns: 1.35fr 1fr;
-    gap: 40px;
+  .howGrid {
+    grid-template-columns: 0.82fr 1.18fr;
+    gap: 52px;
   }
 }
 
 @media (min-width: 1000px) {
   .hero {
-    padding: 76px 24px 36px;
+    padding: 84px 24px 44px;
   }
   .heroGrid {
     grid-template-columns: 1.05fr 0.95fr;
