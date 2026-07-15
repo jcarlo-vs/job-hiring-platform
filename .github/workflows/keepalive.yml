@@ -1,8 +1,8 @@
 name: supabase-keepalive
 
-# Runs a real Postgres query against Supabase (via PostgREST) twice a week so
-# the free-tier inactivity pause (~7 days) is reset. The schedule runs Mon & Thu
-# to absorb GitHub's best-effort cron delays.
+# Runs a real Postgres query against Supabase (via PostgREST) three times a week
+# so the free-tier inactivity pause (~7 days) is reset. The schedule runs Mon,
+# Wed & Fri so no gap exceeds ~3 days, absorbing GitHub's best-effort cron delays.
 #
 # Hits Supabase directly rather than the app's /api/health route so the keepalive
 # keeps working even when the Vercel deployment is down or redeployed at a new URL.
@@ -15,7 +15,7 @@ name: supabase-keepalive
 
 on:
   schedule:
-    - cron: "0 7 * * 1,4" # Mon & Thu 07:00 UTC
+    - cron: "0 7 * * 1,3,5" # Mon, Wed & Fri 07:00 UTC
   workflow_dispatch: {}
 
 permissions:
