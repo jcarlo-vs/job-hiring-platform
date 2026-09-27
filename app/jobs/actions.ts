@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { applicationSubmitted, inngest } from "@/lib/inngest/client";
+import { enqueueScreeningBatch } from "@/lib/queue";
 import { createClient } from "@/utils/supabase/server";
 
 export type JobFormState = { error?: string } | undefined;
@@ -188,13 +188,10 @@ export async function updateJob(
       .eq("job_id", jobId)
       .select("id");
     if (apps && apps.length > 0) {
+      // Screening queue only, batched. Never the email queue: re-scoring against
+      // new requirements must not re-send a confirmation email to every applicant.
       try {
-        await inngest.send(
-          apps.map((a) => ({
-            name: applicationSubmitted.event,
-            data: { applicationId: a.id },
-          })),
-        );
+        await enqueueScreeningBatch(apps.map((a) => a.id));
       } catch (err) {
         console.error(`[job ${jobId}] failed to enqueue re-screen:`, err);
       }

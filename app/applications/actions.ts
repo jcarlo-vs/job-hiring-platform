@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
-import { applicationSubmitted, inngest } from "@/lib/inngest/client";
+import {
+  enqueueApplicationReceived,
+  enqueueScreening,
+} from "@/lib/queue";
 import {
   RESUME_BUCKET,
   RESUME_CONTENT_TYPES,
@@ -166,16 +169,19 @@ export async function applyToJob(jobId: string): Promise<ActionResult> {
     };
   }
 
-  // Enqueue AI screening. Best-effort: the application is already saved, so a
-  // transient queue error must not fail the apply - the row stays PENDING and an
-  // employer can re-screen it. The worker flips it to PROCESSING then DONE/ERROR.
+  // Enqueue AI screening and the applicant's confirmation email. Two separate
+  // queues, and this is the only path that writes to the email one.
+  //
+  // Best-effort: the application is already saved, so a transient queue error
+  // must not fail the apply - the row stays PENDING and an employer can
+  // re-screen it. The worker flips it to PROCESSING then DONE/ERROR.
   try {
-    await inngest.send({
-      name: applicationSubmitted.event,
-      data: { applicationId: appId },
-    });
+    await Promise.all([
+      enqueueScreening(appId),
+      enqueueApplicationReceived(appId),
+    ]);
   } catch (err) {
-    console.error(`[apply] failed to enqueue screening for ${appId}:`, err);
+    console.error(`[apply] failed to enqueue background work for ${appId}:`, err);
   }
 
   revalidatePath("/applications");
@@ -221,11 +227,11 @@ export async function rescreenApplication(
     .eq("id", applicationId);
   if (error) return { ok: false, error: "Could not reset screening." };
 
+  // Screening queue only. Deliberately not the email queue: a re-screen is not a
+  // new application, and emailing "we received your application" again would be
+  // wrong (which is exactly what happened when both workers shared one event).
   try {
-    await inngest.send({
-      name: applicationSubmitted.event,
-      data: { applicationId },
-    });
+    await enqueueScreening(applicationId);
   } catch {
     return { ok: false, error: "Could not queue re-screening. Please retry." };
   }
