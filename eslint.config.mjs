@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Static assets, incl. the vendored PDF.js worker (pdf.worker.min.mjs).
     "public/**",
+    // Bundled Lambda worker output from `npm run build:workers`.
+    "dist/**",
   ]),
 ]);
 

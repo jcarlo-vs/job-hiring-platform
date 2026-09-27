@@ -12,7 +12,11 @@ import {
   formatDate,
   isExpired,
 } from "@/lib/jobs";
-import { createClient } from "@/utils/supabase/server";
+import { getUser } from "@/lib/auth";
+import { asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
+
+type Job = Database["public"]["Tables"]["jobs"]["Row"];
 
 export default async function JobDetailPage({
   params,
@@ -20,20 +24,17 @@ export default async function JobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
 
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // jobs_select_open_or_own already limits this to an open job, one the viewer
+  // owns, or one they applied to, so a miss is genuinely "not available to you".
+  const job = await asUser((db) =>
+    db.one<Job>(`select * from public.jobs where id = $1`, [id]),
+  );
 
   if (!job) return <JobUnavailable />;
 
-  const isOwner = user?.id === job.employer_id;
+  const isOwner = user?.sub === job.employer_id;
   const expired = isExpired(job);
 
   // Non-owners may only view open, unexpired jobs.
@@ -46,20 +47,27 @@ export default async function JobDetailPage({
   let resumeFilename: string | null = null;
   let alreadyApplied = false;
   if (user && !isOwner) {
-    const { data: vp } = await supabase
-      .from("profiles")
-      .select("role, resume_path, resume_filename")
-      .eq("id", user.id)
-      .single();
+    const vp = await asUser((db) =>
+      db.one<{
+        role: string;
+        resume_path: string | null;
+        resume_filename: string | null;
+      }>(
+        `select role, resume_path, resume_filename
+           from public.profiles where id = $1`,
+        [user.sub],
+      ),
+    );
     viewerRole = vp?.role ?? null;
     hasResume = !!vp?.resume_path;
     resumeFilename = vp?.resume_filename ?? null;
-    const { data: existing } = await supabase
-      .from("applications")
-      .select("id")
-      .eq("job_id", job.id)
-      .eq("applicant_id", user.id)
-      .maybeSingle();
+    const existing = await asUser((db) =>
+      db.one<{ id: string }>(
+        `select id from public.applications
+          where job_id = $1 and applicant_id = $2`,
+        [job.id, user.sub],
+      ),
+    );
     alreadyApplied = !!existing;
   }
 

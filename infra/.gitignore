@@ -1,0 +1,13 @@
+# Terraform state contains resource attributes in plaintext, including the
+# generated IAM access key. Never commit it.
+.terraform/
+# .terraform.lock.hcl IS committed on purpose: it pins provider versions.
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Holds the real secret values fed into SSM.
+*.tfvars
+*.tfvars.json
+
+tfplan

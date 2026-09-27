@@ -10,14 +10,14 @@ import {
   type ApplicationStage,
 } from "@/lib/applications";
 import { getProfile } from "@/lib/auth";
-import { Constants } from "@/lib/database.types";
+import { Constants, type Database } from "@/lib/database.types";
 import {
   JOB_CATEGORY_LABELS,
   formatDate,
   isExpired,
   type Job,
 } from "@/lib/jobs";
-import { createClient } from "@/utils/supabase/server";
+import { asUser } from "@/lib/db";
 
 type StageCounts = { total: number; byStage: Partial<Record<ApplicationStage, number>> };
 
@@ -33,14 +33,14 @@ export default async function DashboardPage() {
   const firstName = profile.full_name?.split(" ")[0] ?? "there";
 
   if (profile.role === "EMPLOYER") {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("employer_id", profile.id)
-      .order("created_at", { ascending: false });
-
-    const all = data ?? [];
+    const all = await asUser((db) =>
+      db.query<Job>(
+        `select * from public.jobs
+          where employer_id = $1
+          order by created_at desc`,
+        [profile.id],
+      ),
+    );
     const active = all.filter((j) => j.status === "OPEN" && !isExpired(j));
     const expired = all.filter((j) => j.status === "OPEN" && isExpired(j));
     const closed = all.filter((j) => j.status === "CLOSED");
@@ -48,14 +48,20 @@ export default async function DashboardPage() {
     // Applicant counts per stage, per job (RLS lets an employer read
     // applications for jobs they own). Aggregated in-memory at portfolio volume.
     const jobIds = all.map((j) => j.id);
-    const { data: apps } = jobIds.length
-      ? await supabase
-          .from("applications")
-          .select("job_id, stage")
-          .in("job_id", jobIds)
-      : { data: [] };
+    const apps = jobIds.length
+      ? await asUser((db) =>
+          db.query<{
+            job_id: string;
+            stage: Database["public"]["Enums"]["application_stage"];
+          }>(
+            `select job_id, stage from public.applications
+              where job_id = any($1::uuid[])`,
+            [jobIds],
+          ),
+        )
+      : [];
     const countsByJob = new Map<string, StageCounts>();
-    for (const a of apps ?? []) {
+    for (const a of apps) {
       const c = countsByJob.get(a.job_id) ?? { total: 0, byStage: {} };
       c.total += 1;
       c.byStage[a.stage] = (c.byStage[a.stage] ?? 0) + 1;

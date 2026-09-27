@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { PIPELINE_STAGES, type ApplicationStage } from "@/lib/applications";
+import { getUser } from "@/lib/auth";
+import { getEmailBySub } from "@/lib/cognito";
+import { asAdmin, asUser } from "@/lib/db";
 import { composeEmailHtml, sendEmail } from "@/lib/email";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/utils/supabase/server";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -26,19 +27,18 @@ export async function updateApplicationStage(
     return { ok: false, error: "Invalid stage." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const { data, error } = await supabase
-    .from("applications")
-    .update({ stage })
-    .eq("id", applicationId)
-    .select("id");
-  if (error) return { ok: false, error: error.message };
-  if (!data || data.length === 0) {
+  const updated = await asUser((db) =>
+    db.query<{ id: string }>(
+      `update public.applications set stage = $2::public.application_stage
+        where id = $1
+        returning id`,
+      [applicationId, stage],
+    ),
+  );
+  if (updated.length === 0) {
     return { ok: false, error: "Not found, or you do not own this job." };
   }
 
@@ -69,33 +69,24 @@ export async function sendCandidateEmail(
     return { ok: false, error: "Subject and message are required." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const admin = createAdminClient();
-  const { data: app } = await admin
-    .from("applications")
-    .select("applicant_id, job_id")
-    .eq("id", applicationId)
-    .single();
-  if (!app) return { ok: false, error: "Application not found." };
-
-  const { data: job } = await admin
-    .from("jobs")
-    .select("employer_id")
-    .eq("id", app.job_id)
-    .single();
-  if (!job || job.employer_id !== user.id) {
-    return { ok: false, error: "Not authorized." };
-  }
-
-  const { data: userData } = await admin.auth.admin.getUserById(
-    app.applicant_id,
+  // Ownership checked here in application code, because the read and the log
+  // write both go over the admin connection, which bypasses RLS.
+  const app = await asAdmin((db) =>
+    db.one<{ applicant_id: string }>(
+      `select a.applicant_id
+         from public.applications a
+         join public.jobs j on j.id = a.job_id
+        where a.id = $1 and j.employer_id = $2`,
+      [applicationId, user.sub],
+    ),
   );
-  const email = userData?.user?.email;
+  if (!app) return { ok: false, error: "Not authorized." };
+
+  // The address lives with Cognito, not in profiles.
+  const email = await getEmailBySub(app.applicant_id);
   if (!email) return { ok: false, error: "Applicant email not found." };
 
   let delivered: boolean;
@@ -112,13 +103,14 @@ export async function sendCandidateEmail(
     };
   }
 
-  await admin.from("application_emails").insert({
-    application_id: applicationId,
-    kind,
-    subject: subject.trim(),
-    body: body.trim(),
-    sent_by: user.id,
-  });
+  await asAdmin((db) =>
+    db.query(
+      `insert into public.application_emails
+         (application_id, kind, subject, body, sent_by)
+       values ($1, $2, $3, $4, $5)`,
+      [applicationId, kind, subject.trim(), body.trim(), user.sub],
+    ),
+  );
 
   revalidatePath(`/jobs/${jobId}/applicants/${applicationId}`);
   return { ok: true, delivered };

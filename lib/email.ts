@@ -4,9 +4,10 @@ import { Resend } from "resend";
 // RESEND_API_KEY is unset (e.g. local dev without a key) so callers never crash.
 
 const FROM = process.env.RESEND_FROM ?? "TalentScreen <onboarding@resend.dev>";
+// Fallback must match the live deployment, or every link in every email points
+// at a dead domain whenever NEXT_PUBLIC_SITE_URL is unset.
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  "https://job-hiring-platform-eight.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://talent-screen.vercel.app";
 
 let client: Resend | null = null;
 

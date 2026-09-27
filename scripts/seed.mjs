@@ -6,33 +6,98 @@
 // Run once on a fresh DB:
 //   node --env-file=.env.local scripts/seed.mjs
 //
-// It uses the service-role key (bypasses RLS) and confirms emails so the demo
-// accounts can sign in immediately.
+// It connects as the database owner (bypasses RLS) and creates Cognito users
+// already confirmed, so the demo accounts can sign in immediately.
+//
+// Idempotent: running it again deletes the demo users and their rows first.
 
-import { createClient } from "@supabase/supabase-js";
+import {
+  AdminCreateUserCommand,
+  AdminDeleteUserCommand,
+  AdminSetUserPasswordCommand,
+  CognitoIdentityProviderClient,
+  ListUsersCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { Client } from "pg";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !serviceKey) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+const connectionString =
+  process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+const poolId = process.env.COGNITO_USER_POOL_ID;
+if (!connectionString || !poolId) {
+  console.error("Missing DATABASE_URL / COGNITO_USER_POOL_ID");
   process.exit(1);
 }
-const db = createClient(url, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+
+const db = new Client({ connectionString });
+const idp = new CognitoIdentityProviderClient({
+  region: process.env.COGNITO_REGION ?? "ap-southeast-1",
 });
 
+// Documented in the README. Must satisfy the pool's password policy: 12+ chars,
+// upper, lower, number, symbol.
 const PASSWORD = "Demo!Screen2026";
 const in30Days = new Date(Date.now() + 30 * 86400 * 1000).toISOString();
 
+/**
+ * Create a confirmed Cognito user and its profile row.
+ *
+ * The profile used to be created by the handle_new_user trigger on auth.users.
+ * That table is gone, so the id comes back from Cognito as `sub` and the row is
+ * inserted here - the same thing the signup server action does.
+ */
 async function makeUser({ email, full_name, role, company_name, phone }) {
-  const { data, error } = await db.auth.admin.createUser({
-    email,
-    password: PASSWORD,
-    email_confirm: true,
-    user_metadata: { full_name, role, company_name, phone },
-  });
-  if (error) throw new Error(`createUser ${email}: ${error.message}`);
-  return data.user.id;
+  const created = await idp.send(
+    new AdminCreateUserCommand({
+      UserPoolId: poolId,
+      Username: email,
+      MessageAction: "SUPPRESS",
+      UserAttributes: [
+        { Name: "email", Value: email },
+        { Name: "email_verified", Value: "true" },
+      ],
+    }),
+  );
+  await idp.send(
+    new AdminSetUserPasswordCommand({
+      UserPoolId: poolId,
+      Username: email,
+      Password: PASSWORD,
+      Permanent: true,
+    }),
+  );
+
+  const sub = created.User.Attributes.find((a) => a.Name === "sub").Value;
+  await db.query(
+    `insert into public.profiles (id, role, full_name, company_name, phone)
+     values ($1, $2, $3, nullif($4,''), nullif($5,''))`,
+    [sub, role, full_name, company_name ?? "", phone ?? ""],
+  );
+  return sub;
+}
+
+/** Remove any previous run, so seeding twice is safe. */
+async function reset() {
+  const emails = [
+    "recruiter@talentscreen.dev",
+    ...Object.values(APPLICANTS).map((a) => a.email),
+  ];
+  for (const email of emails) {
+    const found = await idp.send(
+      new ListUsersCommand({
+        UserPoolId: poolId,
+        Filter: `email = "${email}"`,
+        Limit: 1,
+      }),
+    );
+    for (const u of found.Users ?? []) {
+      const sub = u.Attributes.find((a) => a.Name === "sub").Value;
+      await idp.send(
+        new AdminDeleteUserCommand({ UserPoolId: poolId, Username: u.Username }),
+      );
+      // jobs and applications cascade from profiles.
+      await db.query(`delete from public.profiles where id = $1`, [sub]);
+    }
+  }
 }
 
 const JOBS = [
@@ -62,7 +127,7 @@ const JOBS = [
     description:
       "Design and run the services behind our screening pipeline: APIs, background jobs, and data models. You will care about correctness, observability, and clean schemas.",
     requirements:
-      "- 4+ years with Node.js and a SQL database (Postgres preferred)\n- Experience with queues / background jobs and idempotency\n- Solid understanding of auth and row-level security\n- Bonus: Inngest, Supabase",
+      "- 4+ years with Node.js and a SQL database (Postgres preferred)\n- Experience with queues / background jobs and idempotency\n- Solid understanding of auth and row-level security\n- Bonus: AWS (SQS, Lambda), Terraform",
   },
   {
     title: "Machine Learning Engineer",
@@ -298,6 +363,11 @@ const APPLICANTS = {
 };
 
 async function main() {
+  await db.connect();
+
+  console.log("Clearing any previous seed...");
+  await reset();
+
   console.log("Seeding employer...");
   const employerId = await makeUser({
     email: "recruiter@talentscreen.dev",
@@ -307,19 +377,23 @@ async function main() {
   });
 
   console.log(`Inserting ${JOBS.length} jobs...`);
-  const { data: insertedJobs, error: jobErr } = await db
-    .from("jobs")
-    .insert(
-      JOBS.map((j) => ({
-        ...j,
-        employer_id: employerId,
-        status: "OPEN",
-        expires_at: in30Days,
-      })),
-    )
-    .select("id");
-  if (jobErr) throw new Error(`insert jobs: ${jobErr.message}`);
-  const jobIds = insertedJobs.map((j) => j.id);
+  const jobIds = [];
+  for (const j of JOBS) {
+    const { rows } = await db.query(
+      `insert into public.jobs
+         (employer_id, title, description, requirements, location,
+          salary_min, salary_max, salary_period, employment_type,
+          work_mode, category, status, expires_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'OPEN',$12)
+       returning id`,
+      [
+        employerId, j.title, j.description, j.requirements, j.location ?? null,
+        j.salary_min ?? null, j.salary_max ?? null, j.salary_period ?? "ANNUAL",
+        j.employment_type, j.work_mode, j.category, in30Days,
+      ],
+    );
+    jobIds.push(rows[0].id);
+  }
 
   console.log("Seeding applicants...");
   const applicantIds = {};
@@ -331,29 +405,30 @@ async function main() {
       phone: a.phone,
     });
     applicantIds[key] = id;
-    const { error: upErr } = await db
-      .from("profiles")
-      .update({ preferred_categories: a.prefs, onboarded_at: new Date().toISOString() })
-      .eq("id", id);
-    if (upErr) throw new Error(`update profile ${a.email}: ${upErr.message}`);
+    await db.query(
+      `update public.profiles
+          set preferred_categories = $2::public.job_category[],
+              onboarded_at = now()
+        where id = $1`,
+      [id, a.prefs],
+    );
   }
 
   console.log(`Inserting ${APPLICATIONS.length} applications with screening...`);
-  const { error: appErr } = await db.from("applications").insert(
-    APPLICATIONS.map((a) => ({
-      job_id: jobIds[a.jobIndex],
-      applicant_id: applicantIds[a.applicant],
-      stage: a.stage,
-      screening_status: "DONE",
-      ai_score: a.score,
-      ai_recommendation: a.rec,
-      ai_matched: a.matched,
-      ai_missing: a.missing,
-      ai_flags: a.flags,
-      ai_summary: a.summary,
-    })),
-  );
-  if (appErr) throw new Error(`insert applications: ${appErr.message}`);
+  for (const a of APPLICATIONS) {
+    await db.query(
+      `insert into public.applications
+         (job_id, applicant_id, stage, screening_status, ai_score,
+          ai_recommendation, ai_matched, ai_missing, ai_flags, ai_summary)
+       values ($1,$2,$3::public.application_stage,'DONE',$4,
+               $5::public.ai_recommendation,$6::jsonb,$7::jsonb,$8::jsonb,$9)`,
+      [
+        jobIds[a.jobIndex], applicantIds[a.applicant], a.stage, a.score, a.rec,
+        JSON.stringify(a.matched), JSON.stringify(a.missing),
+        JSON.stringify(a.flags), a.summary,
+      ],
+    );
+  }
 
   console.log("\nSeed complete.\n");
   console.log("Employer login:");
@@ -364,7 +439,10 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error("\nSeed failed:", e.message);
-  process.exit(1);
-});
+main()
+  .then(() => db.end())
+  .catch(async (e) => {
+    console.error("\nSeed failed:", e.message);
+    await db.end().catch(() => {});
+    process.exit(1);
+  });

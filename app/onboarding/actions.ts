@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getUser } from "@/lib/auth";
+import { asUser } from "@/lib/db";
 import { isValidCategory, type JobCategory } from "@/lib/jobs";
-import { createClient } from "@/utils/supabase/server";
 
 export type PreferencesState = { saved?: boolean; error?: string } | undefined;
 
@@ -15,26 +16,22 @@ function parseCategories(formData: FormData): JobCategory[] {
   return [...new Set(raw.filter(isValidCategory))];
 }
 
-async function actor() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, user };
-}
+
 
 /** Onboarding "Save": store the picked interests and stamp the shown-flag. */
 export async function completeOnboarding(formData: FormData): Promise<void> {
-  const { supabase, user } = await actor();
+  const user = await getUser();
   if (!user) return;
-  // Update only these two columns (never role) under profiles_update_own RLS.
-  await supabase
-    .from("profiles")
-    .update({
-      preferred_categories: parseCategories(formData),
-      onboarded_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
+  // Only these two columns (never role), under profiles_update_own RLS.
+  await asUser((db) =>
+    db.query(
+      `update public.profiles
+          set preferred_categories = $2::public.job_category[],
+              onboarded_at = now()
+        where id = $1`,
+      [user.sub, parseCategories(formData)],
+    ),
+  );
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
   revalidatePath("/settings/preferences");
@@ -42,12 +39,14 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
 
 /** Onboarding "Skip": stamp the shown-flag only, so it never re-appears. */
 export async function dismissOnboarding(): Promise<void> {
-  const { supabase, user } = await actor();
+  const user = await getUser();
   if (!user) return;
-  await supabase
-    .from("profiles")
-    .update({ onboarded_at: new Date().toISOString() })
-    .eq("id", user.id);
+  await asUser((db) =>
+    db.query(
+      `update public.profiles set onboarded_at = now() where id = $1`,
+      [user.sub],
+    ),
+  );
   revalidatePath("/dashboard");
 }
 
@@ -56,13 +55,21 @@ export async function saveCategoryPreferences(
   _prev: PreferencesState,
   formData: FormData,
 ): Promise<PreferencesState> {
-  const { supabase, user } = await actor();
+  const user = await getUser();
   if (!user) return { error: "Please sign in." };
-  const { error } = await supabase
-    .from("profiles")
-    .update({ preferred_categories: parseCategories(formData) })
-    .eq("id", user.id);
-  if (error) return { error: error.message };
+  try {
+    await asUser((db) =>
+      db.query(
+        `update public.profiles
+            set preferred_categories = $2::public.job_category[]
+          where id = $1`,
+        [user.sub, parseCategories(formData)],
+      ),
+    );
+  } catch (err) {
+    console.error("[preferences]", err);
+    return { error: "Could not save your preferences." };
+  }
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
   revalidatePath("/settings/preferences");

@@ -10,8 +10,10 @@ import {
 import { getProfile } from "@/lib/auth";
 import { formatDate } from "@/lib/jobs";
 import { resumeExtension } from "@/lib/resume";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/utils/supabase/server";
+import { asAdmin, asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
+
+type Application = Database["public"]["Tables"]["applications"]["Row"];
 
 import { CandidateActions } from "./candidate-actions";
 import { MessageCandidate } from "./message-candidate";
@@ -36,41 +38,45 @@ export default async function CandidatePage({
     redirect(`/login?next=/jobs/${jobId}/applicants/${applicationId}`);
   }
 
-  const supabase = await createClient();
-
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("id, title, employer_id")
-    .eq("id", jobId)
-    .single();
+  const job = await asUser((db) =>
+    db.one<{ id: string; title: string; employer_id: string }>(
+      `select id, title, employer_id from public.jobs where id = $1`,
+      [jobId],
+    ),
+  );
   if (!job || job.employer_id !== profile.id) notFound();
 
-  // RLS (private.owns_job) also gates this read; the explicit check above keeps
-  // the not-found path clean.
-  const { data: app } = await supabase
-    .from("applications")
-    .select("*")
-    .eq("id", applicationId)
-    .eq("job_id", jobId)
-    .single();
+  // applications_select_applicant_or_employer (via owns_job) also gates this
+  // read; the explicit check above keeps the not-found path clean.
+  const app = await asUser((db) =>
+    db.one<Application>(
+      `select * from public.applications where id = $1 and job_id = $2`,
+      [applicationId, jobId],
+    ),
+  );
   if (!app) notFound();
 
-  const admin = createAdminClient();
-
-  const { data: applicantProfile } = await admin
-    .from("profiles")
-    .select("full_name, phone")
-    .eq("id", app.applicant_id)
-    .single();
+  // profiles_select_own only exposes the caller's own row, and
+  // application_emails has no client policies at all, so both of these go over
+  // the admin connection - authorized because ownership was verified above.
+  const applicantProfile = await asAdmin((db) =>
+    db.one<{ full_name: string | null; phone: string | null }>(
+      `select full_name, phone from public.profiles where id = $1`,
+      [app.applicant_id],
+    ),
+  );
   const name = applicantProfile?.full_name || "Candidate";
   const phone = applicantProfile?.phone ?? null;
   const company = profile.company_name ?? "[Your Company]";
 
-  const { data: sentEmails } = await admin
-    .from("application_emails")
-    .select("kind, subject, sent_at")
-    .eq("application_id", app.id)
-    .order("sent_at", { ascending: false });
+  const sentEmails = await asAdmin((db) =>
+    db.query<{ kind: string; subject: string; sent_at: string }>(
+      `select kind, subject, sent_at from public.application_emails
+        where application_id = $1
+        order by sent_at desc`,
+      [app.id],
+    ),
+  );
 
   // Served same-origin via the resume route (reliable embedding + the modal).
   const isPdf = app.resume_path

@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { applicationSubmitted, inngest } from "@/lib/inngest/client";
-import { createClient } from "@/utils/supabase/server";
+import { getUser } from "@/lib/auth";
+import { asUser } from "@/lib/db";
+import { enqueueScreeningBatch } from "@/lib/queue";
 
 export type JobFormState = { error?: string } | undefined;
 
@@ -81,24 +82,22 @@ function expiryToTimestamp(dateStr: string): string {
 }
 
 async function getActor() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { supabase, user: null, isEmployer: false };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  return { supabase, user, isEmployer: profile?.role === "EMPLOYER" };
+  const user = await getUser();
+  if (!user) return { user: null, isEmployer: false };
+  const profile = await asUser((db) =>
+    db.one<{ role: string }>(
+      `select role from public.profiles where id = $1`,
+      [user.sub],
+    ),
+  );
+  return { user, isEmployer: profile?.role === "EMPLOYER" };
 }
 
 export async function createJob(
   _prev: JobFormState,
   formData: FormData,
 ): Promise<JobFormState> {
-  const { supabase, user, isEmployer } = await getActor();
+  const { user, isEmployer } = await getActor();
   if (!user) return { error: "Please sign in." };
   if (!isEmployer) return { error: "Only employers can post jobs." };
 
@@ -108,27 +107,30 @@ export async function createJob(
   }
   const d = parsed.data;
 
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .insert({
-      employer_id: user.id,
-      title: d.title,
-      description: d.description,
-      requirements: d.requirements,
-      location: d.location ?? null,
-      salary_min: d.salaryMin,
-      salary_max: d.salaryMax,
-      salary_period: d.salaryPeriod,
-      employment_type: d.employmentType,
-      work_mode: d.workMode,
-      category: d.category,
-      status: "OPEN",
-      expires_at: expiryToTimestamp(d.expiresAt),
-    })
-    .select("id")
-    .single();
-
-  if (error) return { error: error.message };
+  // jobs_insert_employer checks both employer_id = auth.uid() AND that the
+  // caller really is an employer, so the role check above is defence in depth.
+  let job: { id: string } | null;
+  try {
+    job = await asUser((db) =>
+      db.one<{ id: string }>(
+        `insert into public.jobs
+           (employer_id, title, description, requirements, location,
+            salary_min, salary_max, salary_period, employment_type,
+            work_mode, category, status, expires_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'OPEN',$12)
+         returning id`,
+        [
+          user.sub, d.title, d.description, d.requirements, d.location ?? null,
+          d.salaryMin, d.salaryMax, d.salaryPeriod, d.employmentType,
+          d.workMode, d.category, expiryToTimestamp(d.expiresAt),
+        ],
+      ),
+    );
+  } catch (err) {
+    console.error("[createJob]", err);
+    return { error: "Could not post the job." };
+  }
+  if (!job) return { error: "Could not post the job." };
 
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
@@ -140,7 +142,7 @@ export async function updateJob(
   _prev: JobFormState,
   formData: FormData,
 ): Promise<JobFormState> {
-  const { supabase, user, isEmployer } = await getActor();
+  const { user, isEmployer } = await getActor();
   if (!user) return { error: "Please sign in." };
   if (!isEmployer) return { error: "Only employers can edit jobs." };
 
@@ -151,50 +153,51 @@ export async function updateJob(
   const d = parsed.data;
 
   // Read current requirements first, to detect a change (for auto re-screen).
-  const { data: existing } = await supabase
-    .from("jobs")
-    .select("requirements")
-    .eq("id", jobId)
-    .single();
+  const existing = await asUser((db) =>
+    db.one<{ requirements: string }>(
+      `select requirements from public.jobs where id = $1`,
+      [jobId],
+    ),
+  );
 
-  // RLS (jobs_update_own) ensures the employer can only update their own job.
-  const { error } = await supabase
-    .from("jobs")
-    .update({
-      title: d.title,
-      description: d.description,
-      requirements: d.requirements,
-      location: d.location ?? null,
-      salary_min: d.salaryMin,
-      salary_max: d.salaryMax,
-      salary_period: d.salaryPeriod,
-      employment_type: d.employmentType,
-      work_mode: d.workMode,
-      category: d.category,
-      expires_at: expiryToTimestamp(d.expiresAt),
-    })
-    .eq("id", jobId);
-
-  if (error) return { error: error.message };
+  // jobs_update_own means a non-owner updates zero rows rather than being
+  // rejected, which is the safer failure.
+  const updated = await asUser((db) =>
+    db.query<{ id: string }>(
+      `update public.jobs
+          set title = $2, description = $3, requirements = $4, location = $5,
+              salary_min = $6, salary_max = $7, salary_period = $8,
+              employment_type = $9, work_mode = $10, category = $11,
+              expires_at = $12
+        where id = $1
+        returning id`,
+      [
+        jobId, d.title, d.description, d.requirements, d.location ?? null,
+        d.salaryMin, d.salaryMax, d.salaryPeriod, d.employmentType,
+        d.workMode, d.category, expiryToTimestamp(d.expiresAt),
+      ],
+    ),
+  );
+  if (updated.length === 0) return { error: "Could not update the job." };
 
   // Stretch: when the requirements change, the old AI scores no longer reflect
   // the bar. Reset every applicant on this job to PENDING (RLS-scoped via
   // owns_job) and re-enqueue screening; the worker re-scores against the new
   // requirements. Best-effort - a queue hiccup must not fail the edit.
   if (existing && existing.requirements !== d.requirements) {
-    const { data: apps } = await supabase
-      .from("applications")
-      .update({ screening_status: "PENDING" })
-      .eq("job_id", jobId)
-      .select("id");
-    if (apps && apps.length > 0) {
+    const apps = await asUser((db) =>
+      db.query<{ id: string }>(
+        `update public.applications set screening_status = 'PENDING'
+          where job_id = $1
+          returning id`,
+        [jobId],
+      ),
+    );
+    if (apps.length > 0) {
+      // Screening queue only, batched. Never the email queue: re-scoring against
+      // new requirements must not re-send a confirmation email to every applicant.
       try {
-        await inngest.send(
-          apps.map((a) => ({
-            name: applicationSubmitted.event,
-            data: { applicationId: a.id },
-          })),
-        );
+        await enqueueScreeningBatch(apps.map((a) => a.id));
       } catch (err) {
         console.error(`[job ${jobId}] failed to enqueue re-screen:`, err);
       }
@@ -209,30 +212,26 @@ export async function updateJob(
 }
 
 export async function closeJob(jobId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!(await getUser())) return;
   // RLS ensures only the owning employer can update.
-  await supabase.from("jobs").update({ status: "CLOSED" }).eq("id", jobId);
+  await asUser((db) =>
+    db.query(`update public.jobs set status = 'CLOSED' where id = $1`, [jobId]),
+  );
   revalidatePath("/dashboard");
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);
 }
 
 export async function reopenJob(jobId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-  const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
-  await supabase
-    .from("jobs")
-    .update({ status: "OPEN", expires_at: expires.toISOString() })
-    .eq("id", jobId);
+  if (!(await getUser())) return;
+  await asUser((db) =>
+    db.query(
+      `update public.jobs
+          set status = 'OPEN', expires_at = now() + interval '30 days'
+        where id = $1`,
+      [jobId],
+    ),
+  );
   revalidatePath("/dashboard");
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);

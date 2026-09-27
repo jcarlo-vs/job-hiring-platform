@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { BackButton } from "@/components/ui/back-button";
 import { getUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/utils/supabase/server";
+import { asAdmin, asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
 
 import { ApplicantsView, type ApplicantRow } from "./applicants-view";
 
@@ -18,38 +18,56 @@ export default async function ApplicantsPage({
   const user = await getUser();
   if (!user) redirect(`/login?next=/jobs/${jobId}/applicants`);
 
-  const supabase = await createClient();
-
   // Ownership check: jobs_select lets anyone read an OPEN job, so verify the
   // caller is the owning employer before exposing the applicant list.
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("id, title, status, employer_id")
-    .eq("id", jobId)
-    .single();
-  if (!job || job.employer_id !== user.id) notFound();
+  const job = await asUser((db) =>
+    db.one<{
+      id: string;
+      title: string;
+      status: Database["public"]["Enums"]["job_status"];
+      employer_id: string;
+    }>(
+      `select id, title, status, employer_id from public.jobs where id = $1`,
+      [jobId],
+    ),
+  );
+  if (!job || job.employer_id !== user.sub) notFound();
 
-  // Applications for this job (RLS: applications_select via private.owns_job).
-  const { data: apps } = await supabase
-    .from("applications")
-    .select(
-      "id, applicant_id, created_at, stage, screening_status, ai_score, ai_recommendation",
-    )
-    .eq("job_id", jobId)
-    .order("created_at", { ascending: false });
-
-  // Applicant names. profiles RLS only exposes the caller's own row, so read
-  // names with the service role - authorized because ownership is verified above.
-  const applicantIds = [...new Set((apps ?? []).map((a) => a.applicant_id))];
-  const admin = createAdminClient();
-  const { data: profiles } = applicantIds.length
-    ? await admin.from("profiles").select("id, full_name").in("id", applicantIds)
-    : { data: [] };
-  const nameById = new Map(
-    (profiles ?? []).map((p) => [p.id, p.full_name]),
+  // Applications for this job, under RLS: applications_select via owns_job.
+  const apps = await asUser((db) =>
+    db.query<{
+      id: string;
+      applicant_id: string;
+      created_at: string;
+      stage: Database["public"]["Enums"]["application_stage"];
+      screening_status: Database["public"]["Enums"]["screening_status"];
+      ai_score: number | null;
+      ai_recommendation: Database["public"]["Enums"]["ai_recommendation"] | null;
+    }>(
+      `select id, applicant_id, created_at, stage, screening_status,
+              ai_score, ai_recommendation
+         from public.applications
+        where job_id = $1
+        order by created_at desc`,
+      [jobId],
+    ),
   );
 
-  const applicants: ApplicantRow[] = (apps ?? []).map((a) => ({
+  // Applicant names. profiles_select_own only exposes the caller's OWN row, so
+  // these have to come over the admin connection - authorized because ownership
+  // was verified above. Read only.
+  const applicantIds = [...new Set(apps.map((a) => a.applicant_id))];
+  const profiles = applicantIds.length
+    ? await asAdmin((db) =>
+        db.query<{ id: string; full_name: string | null }>(
+          `select id, full_name from public.profiles where id = any($1::uuid[])`,
+          [applicantIds],
+        ),
+      )
+    : [];
+  const nameById = new Map(profiles.map((p) => [p.id, p.full_name]));
+
+  const applicants: ApplicantRow[] = apps.map((a) => ({
     id: a.id,
     applicantName: nameById.get(a.applicant_id) || "Candidate",
     appliedAt: a.created_at,

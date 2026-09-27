@@ -8,7 +8,8 @@ import {
 } from "@/lib/applications";
 import { getProfile } from "@/lib/auth";
 import { formatDate } from "@/lib/jobs";
-import { createClient } from "@/utils/supabase/server";
+import { asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
 
 const TONE_CLASS: Record<ApplicantStatusTone, string> = {
   pending: "border-border text-muted bg-white",
@@ -28,21 +29,33 @@ export default async function ApplicationsPage() {
   const profile = await getProfile();
   if (!profile) redirect("/login?next=/applications");
 
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("applications")
-    .select(
-      "id, created_at, stage, screening_status, job_id, ai_matched, ai_recommendation",
-    )
-    .eq("applicant_id", profile.id)
-    .order("created_at", { ascending: false });
+  // One join instead of two round trips. jobs_select_open_or_own lets an
+  // applicant read a job they applied to even after it closes, so the title
+  // still resolves for historic applications.
+  const applications = await asUser((db) =>
+    db.query<{
+      id: string;
+      created_at: string;
+      stage: Database["public"]["Enums"]["application_stage"];
+      screening_status: Database["public"]["Enums"]["screening_status"];
+      job_id: string;
+      ai_matched: unknown;
+      ai_recommendation: Database["public"]["Enums"]["ai_recommendation"] | null;
+      job_title: string | null;
+    }>(
+      `select a.id, a.created_at, a.stage, a.screening_status, a.job_id,
+              a.ai_matched, a.ai_recommendation, j.title as job_title
+         from public.applications a
+         left join public.jobs j on j.id = a.job_id
+        where a.applicant_id = $1
+        order by a.created_at desc`,
+      [profile.id],
+    ),
+  );
 
-  const applications = data ?? [];
-  const jobIds = [...new Set(applications.map((a) => a.job_id))];
-  const { data: jobs } = jobIds.length
-    ? await supabase.from("jobs").select("id, title").in("id", jobIds)
-    : { data: [] };
-  const titleById = new Map((jobs ?? []).map((j) => [j.id, j.title]));
+  const titleById = new Map(
+    applications.map((a) => [a.job_id, a.job_title ?? ""]),
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">

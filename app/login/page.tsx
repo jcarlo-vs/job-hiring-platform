@@ -1,12 +1,15 @@
 import Link from "next/link";
 
 import { LoginForm } from "./login-form";
+import { GoogleSignIn } from "@/components/google-sign-in";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://talent-screen.vercel.app";
+
   const { error } = await searchParams;
 
   return (
@@ -23,6 +26,7 @@ export default async function LoginPage({
 
       <div className="mt-8">
         <LoginForm />
+        <GoogleSignIn siteUrl={siteUrl} />
       </div>
 
       <p className="text-muted mt-6 text-sm">
