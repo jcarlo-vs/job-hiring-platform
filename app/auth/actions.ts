@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createClient } from "@/utils/supabase/server";
+import * as cognito from "@/lib/cognito";
+import { asAdmin } from "@/lib/db";
+import { clearSessionCookies, setSessionCookies } from "@/lib/session";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -31,6 +33,12 @@ const loginSchema = z.object({
   password: z.string().min(1, "Enter your password"),
 });
 
+/** The `sub` claim, read without verifying: Cognito just issued this token. */
+function subOf(idToken: string): string {
+  const body = idToken.split(".")[1];
+  return JSON.parse(Buffer.from(body, "base64url").toString("utf8")).sub;
+}
+
 export async function signup(
   _prev: AuthState,
   formData: FormData,
@@ -47,32 +55,53 @@ export async function signup(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: {
-        full_name: parsed.data.fullName,
-        role: parsed.data.role,
-        company_name: parsed.data.companyName ?? "",
-        phone: parsed.data.phone ?? "",
-      },
-    },
-  });
-
-  if (error) return { error: error.message };
-
-  // Email confirmation OFF: a session is returned, so go straight in.
-  if (data.session) {
-    revalidatePath("/", "layout");
-    redirect("/dashboard");
+  let tokens;
+  try {
+    tokens = await cognito.signUp(parsed.data.email, parsed.data.password);
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    if (name === "UsernameExistsException") {
+      return { error: "An account with that email already exists." };
+    }
+    if (name === "InvalidPasswordException") {
+      return {
+        error:
+          "Password must be at least 12 characters with upper and lower case, a number and a symbol.",
+      };
+    }
+    console.error("[signup]", err);
+    return { error: "Could not create your account. Please try again." };
   }
 
-  // Email confirmation ON: no session yet.
-  return {
-    message: "Check your email to confirm your account, then sign in.",
-  };
+  const sub = subOf(tokens.idToken);
+
+  // The profile row used to be created by the handle_new_user trigger on
+  // auth.users, which was SECURITY DEFINER. auth.users no longer exists, so it
+  // happens here instead - and over the admin connection for the same reason
+  // the trigger bypassed RLS: there is no session yet to satisfy a policy.
+  try {
+    await asAdmin((db) =>
+      db.query(
+        `insert into public.profiles (id, role, full_name, company_name, phone)
+         values ($1, $2, $3, nullif($4,''), nullif($5,''))
+         on conflict (id) do nothing`,
+        [
+          sub,
+          parsed.data.role,
+          parsed.data.fullName,
+          parsed.data.companyName ?? "",
+          parsed.data.phone ?? "",
+        ],
+      ),
+    );
+  } catch (err) {
+    console.error("[signup] profile insert failed", err);
+    return { error: "Could not finish setting up your account." };
+  }
+
+  await setSessionCookies(tokens, sub);
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
 }
 
 export async function login(
@@ -87,17 +116,23 @@ export async function login(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "Invalid email or password" };
+  let tokens;
+  try {
+    tokens = await cognito.signIn(parsed.data.email, parsed.data.password);
+  } catch {
+    // Deliberately one message for both "no such user" and "wrong password".
+    // The pool also has prevent_user_existence_errors enabled, so Cognito does
+    // not leak which it was either.
+    return { error: "Invalid email or password" };
+  }
 
+  await setSessionCookies(tokens, subOf(tokens.idToken));
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
 export async function signout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await clearSessionCookies();
   revalidatePath("/", "layout");
   redirect("/login");
 }

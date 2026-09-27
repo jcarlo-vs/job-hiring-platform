@@ -1,7 +1,8 @@
 import type { SQSBatchResponse, SQSEvent } from "aws-lambda";
 
+import { getEmailBySub } from "@/lib/cognito";
+import { asAdmin } from "@/lib/db";
 import { applicationReceivedEmail, sendEmail } from "@/lib/email";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 import { loadSecrets } from "./config";
 
@@ -42,36 +43,31 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 }
 
 async function sendOne(applicationId: string): Promise<void> {
-  const admin = createAdminClient();
-
-  const { data: app } = await admin
-    .from("applications")
-    .select("applicant_id, job_id")
-    .eq("id", applicationId)
-    .single();
-  if (!app) {
+  const row = await asAdmin((db) =>
+    db.one<{
+      applicant_id: string;
+      full_name: string | null;
+      title: string;
+    }>(
+      `select a.applicant_id, p.full_name, j.title
+         from public.applications a
+         join public.jobs j on j.id = a.job_id
+         join public.profiles p on p.id = a.applicant_id
+        where a.id = $1`,
+      [applicationId],
+    ),
+  );
+  if (!row) {
     throw new PermanentError(`Application ${applicationId} not found.`);
   }
 
-  // The address lives in auth.users, not profiles, so it comes from the admin
-  // auth API rather than a table read.
-  const [{ data: job }, { data: userData }, { data: profile }] =
-    await Promise.all([
-      admin.from("jobs").select("title").eq("id", app.job_id).single(),
-      admin.auth.admin.getUserById(app.applicant_id),
-      admin
-        .from("profiles")
-        .select("full_name")
-        .eq("id", app.applicant_id)
-        .single(),
-    ]);
-
-  const email = userData?.user?.email;
+  // The address lives with Cognito, not in profiles.
+  const email = await getEmailBySub(row.applicant_id);
   if (!email) throw new PermanentError("Applicant email not found.");
 
   const { subject, html } = applicationReceivedEmail({
-    name: profile?.full_name ?? null,
-    jobTitle: job?.title ?? "the role",
+    name: row.full_name,
+    jobTitle: row.title,
   });
 
   const sent = await sendEmail({ to: email, subject, html });

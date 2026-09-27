@@ -76,7 +76,7 @@ resource "aws_sqs_queue" "main" {
 #
 # SSM Parameter Store standard tier is free. Lambda environment variables would
 # be simpler but Terraform writes them into terraform.tfstate in plaintext, and
-# one of these is the Supabase service-role key that bypasses RLS.
+# one of these is the Neon owner connection string, which bypasses RLS.
 # ---------------------------------------------------------------------------
 
 resource "aws_ssm_parameter" "secret" {
@@ -124,13 +124,24 @@ resource "aws_lambda_function" "worker" {
   timeout     = each.value.timeout
   memory_size = each.value.memory
 
-  # Bounds Anthropic rate limits and Supabase connections. Matches the
-  # concurrency: { limit: 5 } the Inngest function used.
-  reserved_concurrent_executions = 5
+  # No reserved_concurrent_executions on purpose. This account's Lambda
+  # concurrency quota is 10 (a new-account restriction, not the usual 1000) and
+  # AWS requires the same 10 stay unreserved, so any reservation is rejected and
+  # the apply fails after creating the function. The account-wide cap of 10
+  # already bounds Anthropic rate limits and database connections more tightly
+  # than the concurrency: { limit: 5 } the Inngest function used, so nothing is
+  # lost. If the quota is ever raised past 110, add:
+  #   reserved_concurrent_executions = 5
 
   environment {
     variables = {
       SSM_PREFIX = "/${var.project}"
+      # Not secrets, so plain environment variables rather than SSM.
+      RESUME_BUCKET        = aws_s3_bucket.resumes.id
+      COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
+      COGNITO_REGION       = var.region
+      SQS_REGION           = var.region
+      NEXT_PUBLIC_SITE_URL = var.site_url
     }
   }
 
@@ -147,6 +158,13 @@ resource "aws_lambda_event_source_mapping" "worker" {
   # Without this, one poison message redelivers the whole batch and the good
   # messages in it get processed repeatedly.
   function_response_types = ["ReportBatchItemFailures"]
+
+  # AWS validates that the execution role can read the queue at the moment the
+  # mapping is created, and IAM is eventually consistent. Terraform has no
+  # implicit edge to the role *policy* (only to the role via the function), so
+  # without this the first apply races IAM propagation and fails with
+  # InvalidParameterValueException on a cold account.
+  depends_on = [aws_iam_role_policy.worker]
 }
 
 # ---------------------------------------------------------------------------

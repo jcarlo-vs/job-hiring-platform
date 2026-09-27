@@ -23,7 +23,7 @@ export type CtaState =
 /**
  * Pure presentational detail view for the selected job. Mirrors the standalone
  * /jobs/[id] page content; the CTA branch is resolved upstream and passed in,
- * so this component never touches Supabase.
+ * so this component never touches the database.
  */
 export function JobDetailPanel({ job, cta }: { job: Job; cta: CtaState }) {
   return (

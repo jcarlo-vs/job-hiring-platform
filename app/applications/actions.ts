@@ -2,55 +2,47 @@
 
 import { revalidatePath } from "next/cache";
 
-import {
-  enqueueApplicationReceived,
-  enqueueScreening,
-} from "@/lib/queue";
-import {
-  RESUME_BUCKET,
-  RESUME_CONTENT_TYPES,
-  resumeExtension,
-} from "@/lib/resume";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/utils/supabase/server";
+import { getUser } from "@/lib/auth";
+import { asAdmin, asUser } from "@/lib/db";
+import { enqueueApplicationReceived, enqueueScreening } from "@/lib/queue";
+import { RESUME_CONTENT_TYPES, resumeExtension } from "@/lib/resume";
+import { copyResume, createResumeUpload, getResumeUrl } from "@/lib/storage";
 
 type UploadUrlResult =
-  | { ok: true; path: string; token: string }
+  | { ok: true; path: string; url: string; fields: Record<string, string> }
   | { ok: false; error: string };
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-/** Issue a signed upload URL for the current user's profile resume. */
+/**
+ * Issue a presigned upload for the current user's profile resume.
+ *
+ * The POST policy caps content type and size server side, so a client cannot
+ * upload something else to a path we signed.
+ */
 export async function createResumeUploadUrl(
   filename: string,
 ): Promise<UploadUrlResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
   const ext = resumeExtension(filename);
-  if (!RESUME_CONTENT_TYPES[ext]) {
+  const contentType = RESUME_CONTENT_TYPES[ext];
+  if (!contentType) {
     return {
       ok: false,
       error: "Upload a PDF or Word document (.pdf, .doc, .docx).",
     };
   }
 
-  const path = `profiles/${user.id}/cv.${ext}`;
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(RESUME_BUCKET)
-    .createSignedUploadUrl(path, { upsert: true });
-
-  if (error || !data?.token) {
-    return {
-      ok: false,
-      error: "Could not start the upload. Please try again.",
-    };
+  const path = `profiles/${user.sub}/cv.${ext}`;
+  try {
+    const { url, fields } = await createResumeUpload(path, contentType);
+    return { ok: true, path, url, fields };
+  } catch (err) {
+    console.error("[resume-upload]", err);
+    return { ok: false, error: "Could not start the upload. Please try again." };
   }
-  return { ok: true, path: data.path ?? path, token: data.token };
 }
 
 /** Save the uploaded resume as the user's profile default. */
@@ -58,34 +50,24 @@ export async function setProfileResume(
   path: string,
   filename: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
-  if (!path.startsWith(`profiles/${user.id}/`)) {
+  if (!path.startsWith(`profiles/${user.sub}/`)) {
     return { ok: false, error: "Invalid upload path." };
   }
 
-  const { data: prev } = await supabase
-    .from("profiles")
-    .select("resume_path")
-    .eq("id", user.id)
-    .single();
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      resume_path: path,
-      resume_filename: filename,
-      resume_uploaded_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
-  if (error) return { ok: false, error: error.message };
-
-  if (prev?.resume_path && prev.resume_path !== path) {
-    const admin = createAdminClient();
-    await admin.storage.from(RESUME_BUCKET).remove([prev.resume_path]);
+  // Under RLS: profiles_update_own means this can only ever touch their row.
+  const updated = await asUser((db) =>
+    db.query<{ id: string }>(
+      `update public.profiles
+          set resume_path = $1, resume_filename = $2, resume_uploaded_at = now()
+        where id = $3
+        returning id`,
+      [path, filename, user.sub],
+    ),
+  );
+  if (updated.length === 0) {
+    return { ok: false, error: "Could not save your resume." };
   }
 
   revalidatePath("/dashboard");
@@ -96,42 +78,35 @@ export async function setProfileResume(
 export async function getMyResumeUrl(): Promise<
   { ok: true; url: string } | { ok: false; error: string }
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("resume_path")
-    .eq("id", user.id)
-    .single();
+  const profile = await asUser((db) =>
+    db.one<{ resume_path: string | null }>(
+      `select resume_path from public.profiles where id = $1`,
+      [user.sub],
+    ),
+  );
   if (!profile?.resume_path) return { ok: false, error: "No resume on file." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(RESUME_BUCKET)
-    .createSignedUrl(profile.resume_path, 120);
-  if (error || !data?.signedUrl) {
+  try {
+    return { ok: true, url: await getResumeUrl(profile.resume_path, 120) };
+  } catch {
     return { ok: false, error: "Could not open the resume." };
   }
-  return { ok: true, url: data.signedUrl };
 }
 
 /** Apply to a job using the profile resume, snapshotting it per application. */
 export async function applyToJob(jobId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, resume_path")
-    .eq("id", user.id)
-    .single();
+  const profile = await asUser((db) =>
+    db.one<{ role: string; resume_path: string | null }>(
+      `select role, resume_path from public.profiles where id = $1`,
+      [user.sub],
+    ),
+  );
   if (!profile) return { ok: false, error: "Profile not found." };
   if (profile.role !== "APPLICANT") {
     return { ok: false, error: "Only job seekers can apply." };
@@ -142,27 +117,35 @@ export async function applyToJob(jobId: string): Promise<ActionResult> {
   const appId = crypto.randomUUID();
   const destPath = `${jobId}/${appId}.${ext}`;
 
-  // Insert under the user session so RLS enforces: own applicant_id, job OPEN
-  // and not expired, and one application per job (unique constraint).
-  const { error: insertError } = await supabase.from("applications").insert({
-    id: appId,
-    job_id: jobId,
-    applicant_id: user.id,
-    resume_path: destPath,
-  });
-  if (insertError) {
-    if (insertError.code === "23505")
-      return { ok: false, error: "already_applied" };
+  // Inserted as the user, so the database enforces it: own applicant_id, job
+  // OPEN and not expired, one application per job. None of that is checked here.
+  try {
+    await asUser((db) =>
+      db.query(
+        `insert into public.applications (id, job_id, applicant_id, resume_path)
+         values ($1, $2, $3, $4)`,
+        [appId, jobId, user.sub, destPath],
+      ),
+    );
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "23505") return { ok: false, error: "already_applied" };
+    // 42501 is insufficient_privilege: the RLS check failed, which here means
+    // the job is closed, expired, or gone.
+    if (code === "42501") return { ok: false, error: "unavailable" };
+    console.error("[apply] insert failed", err);
     return { ok: false, error: "unavailable" };
   }
 
-  // Snapshot the profile resume into the application path (service role).
-  const admin = createAdminClient();
-  const { error: copyError } = await admin.storage
-    .from(RESUME_BUCKET)
-    .copy(profile.resume_path, destPath);
-  if (copyError) {
-    await admin.from("applications").delete().eq("id", appId);
+  // Snapshot the profile resume onto the application path, so replacing the CV
+  // later does not rewrite what was actually submitted.
+  try {
+    await copyResume(profile.resume_path, destPath);
+  } catch (err) {
+    console.error("[apply] resume copy failed", err);
+    await asAdmin((db) =>
+      db.query(`delete from public.applications where id = $1`, [appId]),
+    );
     return {
       ok: false,
       error: "Could not attach your resume. Please try again.",
@@ -174,7 +157,7 @@ export async function applyToJob(jobId: string): Promise<ActionResult> {
   //
   // Best-effort: the application is already saved, so a transient queue error
   // must not fail the apply - the row stays PENDING and an employer can
-  // re-screen it. The worker flips it to PROCESSING then DONE/ERROR.
+  // re-screen it.
   try {
     await Promise.all([
       enqueueScreening(appId),
@@ -191,41 +174,37 @@ export async function applyToJob(jobId: string): Promise<ActionResult> {
 
 /**
  * Employer-only: re-run AI screening for an application on one of their jobs.
- * Resets the row to PENDING and re-enqueues. Ownership is verified here, and the
- * status reset uses the service-role client so it does not depend on an employer
- * UPDATE policy on applications (the employer applicant UI lands in Phase 5).
+ *
+ * Ownership is checked here in application code because the status reset uses
+ * the admin connection, which bypasses RLS. Authorize first, then bypass.
  */
 export async function rescreenApplication(
   applicationId: string,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const admin = createAdminClient();
-  const { data: app } = await admin
-    .from("applications")
-    .select("job_id")
-    .eq("id", applicationId)
-    .single();
-  if (!app) return { ok: false, error: "Application not found." };
+  const owned = await asAdmin((db) =>
+    db.one<{ id: string }>(
+      `select a.id
+         from public.applications a
+         join public.jobs j on j.id = a.job_id
+        where a.id = $1 and j.employer_id = $2`,
+      [applicationId, user.sub],
+    ),
+  );
+  if (!owned) return { ok: false, error: "Not authorized." };
 
-  const { data: job } = await admin
-    .from("jobs")
-    .select("employer_id")
-    .eq("id", app.job_id)
-    .single();
-  if (!job || job.employer_id !== user.id) {
-    return { ok: false, error: "Not authorized." };
+  try {
+    await asAdmin((db) =>
+      db.query(
+        `update public.applications set screening_status = 'PENDING' where id = $1`,
+        [applicationId],
+      ),
+    );
+  } catch {
+    return { ok: false, error: "Could not reset screening." };
   }
-
-  const { error } = await admin
-    .from("applications")
-    .update({ screening_status: "PENDING" })
-    .eq("id", applicationId);
-  if (error) return { ok: false, error: "Could not reset screening." };
 
   // Screening queue only. Deliberately not the email queue: a re-screen is not a
   // new application, and emailing "we received your application" again would be

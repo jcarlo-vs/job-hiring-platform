@@ -3,7 +3,7 @@
 Terraform for the AWS half of the background pipeline. Owns **only** AWS:
 two SQS queues, two dead-letter queues, two Lambda workers, their IAM roles,
 the SSM parameters holding their secrets, and a publish-only IAM user for
-Vercel. Supabase and Vercel are managed outside Terraform.
+Vercel. Neon and Vercel are managed outside Terraform.
 
 Design notes live in `docs/superpowers/specs/2026-09-26-aws-queue-workers-design.md`.
 
@@ -23,18 +23,20 @@ cd infra
 
 ```hcl
 secrets = {
-  NEXT_PUBLIC_SUPABASE_URL  = "https://xxxx.supabase.co"
-  SUPABASE_SERVICE_ROLE_KEY = "eyJ..."
-  ANTHROPIC_API_KEY         = "sk-ant-..."
-  RESEND_API_KEY            = "re_..."
-  RESEND_FROM               = "TalentScreen <you@yourdomain.com>"
-  NEXT_PUBLIC_SITE_URL      = "https://talent-screen.vercel.app"
+  # Neon OWNER connection. The workers bypass RLS by design, which is why this
+  # is the one required secret.
+  DATABASE_URL      = "postgresql://...neon.tech/neondb?sslmode=verify-full"
+  ANTHROPIC_API_KEY = "sk-ant-..."
+  RESEND_API_KEY    = "re_..."
 }
 ```
 
-Only the first two are required. The workers degrade gracefully without the
+Only `DATABASE_URL` is required. The workers degrade gracefully without the
 rest: screening surfaces an `ERROR` with no Anthropic key, and email no-ops
 with no Resend key.
+
+Non-secrets (the S3 bucket name, the Cognito pool id, the site URL) are plain
+Lambda environment variables set by Terraform, not stored here.
 
 **3. Apply.**
 
@@ -89,3 +91,28 @@ State is local and gitignored. It contains the publisher's secret access key in
 plaintext, so it must never be committed. Moving to an S3 backend with
 DynamoDB locking is the obvious next step and is deliberately not done yet:
 there is one operator and one workstation.
+
+## Why every apply shows a Lambda update
+
+`zip` embeds file timestamps, so `npm run build:workers` produces a different
+`source_code_hash` even when the JavaScript is byte-identical. Terraform
+therefore plans an in-place code update on every apply after a rebuild. It is
+free and harmless; not worth chasing reproducible zips for.
+
+## Cognito
+
+`cognito.tf` creates the user pool that replaces Supabase Auth. The app verifies
+ID tokens against its JWKS and uses `sub` as `profiles.id`.
+
+There is deliberately **no pre-token-generation trigger**. One existed while the
+plan was to have Supabase trust Cognito as a third-party auth provider, because
+Supabase reads a `role` claim to choose a Postgres role. Going straight to Neon
+made it dead weight: we set the RLS context ourselves and nothing reads a custom
+claim.
+
+## S3
+
+`s3.tf` creates the private resumes bucket. Uploads are browser-to-S3 via a
+presigned **POST**, not PUT: a PUT cannot enforce a size limit, and the POST
+policy keeps the `content-length-range` and `Content-Type` guarantees the
+original Supabase bucket config provided.

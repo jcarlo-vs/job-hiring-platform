@@ -4,6 +4,8 @@ import {
   SQSClient,
 } from "@aws-sdk/client-sqs";
 
+import { awsCredentials } from "@/lib/aws-credentials";
+
 // SERVER ONLY. Publishes background work to SQS. Replaces lib/inngest/client.ts.
 //
 // Two queues, not one topic fanning out to both consumers. The apply path
@@ -33,7 +35,10 @@ const LOCAL = process.env.QUEUE_LOCAL === "1";
 let client: SQSClient | null = null;
 
 function sqs(): SQSClient {
-  client ??= new SQSClient({ region: process.env.AWS_REGION ?? "us-east-1" });
+  client ??= new SQSClient({
+    region: process.env.SQS_REGION ?? "us-east-1",
+    credentials: awsCredentials(),
+  });
   return client;
 }
 
@@ -55,7 +60,7 @@ function localEvent(applicationId: string) {
         md5OfBody: "",
         eventSource: "aws:sqs",
         eventSourceARN: "local",
-        awsRegion: process.env.AWS_REGION ?? "us-east-1",
+        awsRegion: process.env.SQS_REGION ?? "us-east-1",
       },
     ],
   };

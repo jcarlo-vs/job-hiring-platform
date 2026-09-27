@@ -4,8 +4,11 @@ import { JobFilters } from "@/components/job-filters";
 import { JobsMasterDetail } from "@/components/jobs-master-detail";
 import { getProfile } from "@/lib/auth";
 import { Constants } from "@/lib/database.types";
+import { asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
 import { PAGE_SIZE, isValidCategory } from "@/lib/jobs";
-import { createClient } from "@/utils/supabase/server";
+
+type Job = Database["public"]["Tables"]["jobs"]["Row"];
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -42,57 +45,67 @@ export default async function JobsPage({
   // the dropdown never disagrees with the results and the opt-out stays sticky.
   const preApplied = !validCategory && categoryAbsent && prefs.length > 0;
 
-  const supabase = await createClient();
-  let query = supabase
-    .from("jobs")
-    .select("*", { count: "exact" })
-    .eq("status", "OPEN")
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+  // Built as parameterised SQL rather than a query builder. RLS still applies
+  // (jobs_select_open_or_own), so this cannot return a job the viewer may not
+  // see even if a filter below were wrong.
+  const where: string[] = [
+    "status = 'OPEN'",
+    "(expires_at is null or expires_at > now())",
+  ];
+  const params: unknown[] = [];
+  const bind = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
 
   if (q) {
-    const safe = q.replace(/[%,()]/g, " ");
-    query = query.or(
-      `title.ilike.%${safe}%,description.ilike.%${safe}%,requirements.ilike.%${safe}%`,
+    const like = `%${q}%`;
+    where.push(
+      `(title ilike ${bind(like)} or description ilike ${bind(like)} or requirements ilike ${bind(like)})`,
     );
   }
-  if (location) query = query.ilike("location", `%${location}%`);
+  if (location) where.push(`location ilike ${bind(`%${location}%`)}`);
   if (
     employmentType &&
     (Constants.public.Enums.employment_type as readonly string[]).includes(
       employmentType,
     )
   ) {
-    query = query.eq(
-      "employment_type",
-      employmentType as (typeof Constants.public.Enums.employment_type)[number],
-    );
+    where.push(`employment_type = ${bind(employmentType)}::public.employment_type`);
   }
   if (
     workMode &&
     (Constants.public.Enums.work_mode as readonly string[]).includes(workMode)
   ) {
-    query = query.eq(
-      "work_mode",
-      workMode as (typeof Constants.public.Enums.work_mode)[number],
-    );
+    where.push(`work_mode = ${bind(workMode)}::public.work_mode`);
   }
   if (validCategory) {
-    query = query.eq("category", validCategory);
+    where.push(`category = ${bind(validCategory)}::public.job_category`);
   } else if (preApplied) {
-    query = query.in("category", prefs);
+    where.push(`category = any(${bind(prefs)}::public.job_category[])`);
   }
   const salaryMinNum = Number.parseInt(salaryMin, 10);
   if (Number.isFinite(salaryMinNum) && salaryMinNum > 0) {
-    query = query.gte("salary_max", salaryMinNum);
+    where.push(`salary_max >= ${bind(salaryMinNum)}`);
   }
 
-  const {
-    data: jobs,
-    count,
-    error,
-  } = await query
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const clause = where.join(" and ");
+
+  // One round trip for the page and its total, so paging stays consistent.
+  const rows = await asUser((db) =>
+    db.query<Job & { total_count: string }>(
+      `select *, count(*) over() as total_count
+         from public.jobs
+        where ${clause}
+        order by created_at desc
+        limit ${bind(PAGE_SIZE)} offset ${bind((page - 1) * PAGE_SIZE)}`,
+      params,
+    ),
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const jobs: Job[] = rows.map(({ total_count, ...job }) => job as Job);
+  const count = rows.length > 0 ? Number(rows[0].total_count) : 0;
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -100,16 +113,15 @@ export default async function JobsPage({
   // Per-job apply-state for the panel CTA: the viewer's applied job ids among
   // this page's results (bounded by PAGE_SIZE). Guests skip the query.
   let appliedJobIds: string[] = [];
-  if (profile && jobs && jobs.length > 0) {
-    const { data: applied } = await supabase
-      .from("applications")
-      .select("job_id")
-      .eq("applicant_id", profile.id)
-      .in(
-        "job_id",
-        jobs.map((j) => j.id),
-      );
-    appliedJobIds = [...new Set((applied ?? []).map((a) => a.job_id))];
+  if (profile && jobs.length > 0) {
+    const applied = await asUser((db) =>
+      db.query<{ job_id: string }>(
+        `select job_id from public.applications
+          where applicant_id = $1 and job_id = any($2::uuid[])`,
+        [profile.id, jobs.map((j) => j.id)],
+      ),
+    );
+    appliedJobIds = [...new Set(applied.map((a) => a.job_id))];
   }
 
   const viewer = {
@@ -170,9 +182,7 @@ export default async function JobsPage({
         </div>
       )}
 
-      {error ? (
-        <p className="form-error mt-8">Could not load jobs. Please try again.</p>
-      ) : !jobs || jobs.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="border-border text-muted mt-8 rounded-2xl border-2 border-dashed p-12 text-center text-sm">
           No jobs match your search. Try clearing the filters.
         </div>

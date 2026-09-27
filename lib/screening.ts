@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-// SERVER ONLY - reads ANTHROPIC_API_KEY. Runs in the Inngest worker.
+// SERVER ONLY - reads ANTHROPIC_API_KEY. Runs in the screening Lambda worker.
 
 /**
  * Cheap, fast, and sufficient for structured scoring at portfolio volume

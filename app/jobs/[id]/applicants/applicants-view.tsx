@@ -16,7 +16,6 @@ import {
   type ScreeningStatus,
 } from "@/lib/applications";
 
-import { createClient } from "@/utils/supabase/client";
 
 import { updateApplicationStage } from "./actions";
 import { PipelineBoard } from "./pipeline-board";
@@ -115,59 +114,27 @@ export function ApplicantsView({
   }
   const [, startTransition] = useTransition();
 
-  // Live updates: merge screening results / stage changes as they land in the
-  // DB (Supabase Realtime; RLS scopes events to rows this employer can read).
-  // New applications need a server read for the name, so they full-refresh.
+  // Live updates. Supabase Realtime is gone with Supabase, so this polls
+  // instead: a server refresh every 10 seconds while the tab is visible.
+  //
+  // Polling is the honest trade for dropping Realtime. It only costs anything
+  // while an employer is actually looking at this page, it stops when the tab
+  // is hidden, and a screening finishing a few seconds late is not a problem
+  // worth a websocket. Drag-and-drop already updates optimistically, so the
+  // interaction itself never waits for this.
   useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`applications-${jobId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "applications",
-          filter: `job_id=eq.${jobId}`,
-        },
-        (payload) => {
-          const row = payload.new as {
-            id: string;
-            stage: ApplicationStage;
-            screening_status: ScreeningStatus;
-            ai_score: number | null;
-            ai_recommendation: AiRecommendation | null;
-          };
-          setApplicants((cur) =>
-            cur.map((a) =>
-              a.id === row.id
-                ? {
-                    ...a,
-                    stage: row.stage,
-                    screeningStatus: row.screening_status,
-                    aiScore: row.ai_score,
-                    aiRecommendation: row.ai_recommendation,
-                  }
-                : a,
-            ),
-          );
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "applications",
-          filter: `job_id=eq.${jobId}`,
-        },
-        () => router.refresh(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
+    const tick = () => {
+      if (document.visibilityState === "visible") {
+        startTransition(() => router.refresh());
+      }
     };
-  }, [jobId, router]);
+    const id = setInterval(tick, 10_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [router, startTransition]);
   const [view, setView] = useState<View>("table");
   const [stageFilter, setStageFilter] = useState<ApplicationStage | "ALL">("ALL");
   const [sort, setSort] = useState<SortKey>("recommended");

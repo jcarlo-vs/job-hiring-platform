@@ -170,12 +170,18 @@ screening (long-running, one AI call each) and leave email at the default.
 | Runtime | `nodejs22.x` | `nodejs22.x` |
 | Memory | 1024 MB | 256 MB |
 | Timeout | 120 s | 30 s |
-| Reserved concurrency | 5 | 5 |
+| Reserved concurrency | none (see below) | none |
 | Queue visibility timeout | 720 s (6x timeout) | 180 s |
 | `maxReceiveCount` | 3 | 3 |
 
-Concurrency 5 matches the current Inngest `concurrency: { limit: 5 }` and keeps
-Anthropic rate limits and Supabase connections bounded.
+No reserved concurrency. The plan was 5 per function, matching Inngest's
+`concurrency: { limit: 5 }`, but this account's Lambda quota is 10 (a
+new-account restriction, not the usual 1000) and AWS requires the same 10 stay
+unreserved, so any reservation is rejected *after* the function is created,
+which taints it and aborts the apply. The account-wide cap of 10 bounds
+Anthropic rate limits and Supabase connections more tightly than the per-function
+reservation would have, so nothing is lost. Under a burst, Lambda throttles and
+SQS simply redelivers.
 
 Free-tier headroom check: 1 GB x 30 s = 30 GB-seconds per screening, against
 400,000 GB-seconds/month free. Roughly 13,000 screenings/month at $0.

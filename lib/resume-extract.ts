@@ -1,11 +1,11 @@
 import { extractRawText } from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
 
-import { RESUME_BUCKET, resumeExtension } from "@/lib/resume";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { resumeExtension } from "@/lib/resume";
+import { getResumeBytes } from "@/lib/storage";
 
 // SERVER ONLY. unpdf ships a serverless PDF.js build and mammoth needs Node;
-// both run in the Inngest worker on the Node runtime, never in the browser.
+// both run in the screening Lambda worker on Node, never in the browser.
 
 /** Upper bound on resume text handed to the model (characters) - a long CV. */
 const MAX_RESUME_CHARS = 40_000;
@@ -14,23 +14,21 @@ const MAX_RESUME_CHARS = 40_000;
 const MIN_RESUME_CHARS = 20;
 
 /**
- * Download an application's snapshotted resume from the private bucket (service
- * role, so it bypasses storage RLS) and extract its plain text. PDF via unpdf,
+ * Download an application's snapshotted resume from the private S3 bucket and
+ * extract its plain text. PDF via unpdf,
  * .doc/.docx via mammoth. Throws on an unsupported type or empty extraction so
  * the worker marks the screening ERROR rather than feeding the model junk.
  */
 export async function extractResumeText(resumePath: string): Promise<string> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(RESUME_BUCKET)
-    .download(resumePath);
-  if (error || !data) {
+  let buffer: Buffer;
+  try {
+    buffer = await getResumeBytes(resumePath);
+  } catch (err) {
     throw new Error(
-      `Could not download resume at ${resumePath}: ${error?.message ?? "missing"}`,
+      `Could not download resume at ${resumePath}: ${err instanceof Error ? err.message : "missing"}`,
     );
   }
 
-  const buffer = Buffer.from(await data.arrayBuffer());
   const ext = resumeExtension(resumePath);
 
   let text: string;

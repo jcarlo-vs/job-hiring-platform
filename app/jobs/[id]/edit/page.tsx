@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { updateJob } from "@/app/jobs/actions";
 import { JobForm } from "@/app/jobs/job-form";
 import { getProfile } from "@/lib/auth";
-import { createClient } from "@/utils/supabase/server";
+import { asUser } from "@/lib/db";
+import type { Database } from "@/lib/database.types";
+
+type Job = Database["public"]["Tables"]["jobs"]["Row"];
 
 export default async function EditJobPage({
   params,
@@ -15,12 +18,9 @@ export default async function EditJobPage({
   const profile = await getProfile();
   if (!profile) redirect(`/login?next=/jobs/${id}/edit`);
 
-  const supabase = await createClient();
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const job = await asUser((db) =>
+    db.one<Job>(`select * from public.jobs where id = $1`, [id]),
+  );
 
   if (!job || job.employer_id !== profile.id) {
     return (

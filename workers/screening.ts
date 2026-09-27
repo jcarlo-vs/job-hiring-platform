@@ -1,8 +1,8 @@
 import type { SQSBatchResponse, SQSEvent } from "aws-lambda";
 
+import { asAdmin } from "@/lib/db";
 import { extractResumeText } from "@/lib/resume-extract";
 import { screenResume } from "@/lib/screening";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 import { loadSecrets } from "./config";
 
@@ -56,59 +56,61 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 }
 
 async function screenOne(applicationId: string): Promise<void> {
-  const admin = createAdminClient();
-
-  const markError = async () => {
-    await admin
-      .from("applications")
-      .update({ screening_status: "ERROR" })
-      .eq("id", applicationId);
-  };
+  const markError = () =>
+    asAdmin((db) =>
+      db.query(
+        `update public.applications set screening_status = 'ERROR' where id = $1`,
+        [applicationId],
+      ),
+    );
 
   // 1. Claim. The conditional update is atomic in Postgres, so it doubles as the
   //    "don't double-process" guard even if the message is delivered twice.
-  const { data: claimed, error: claimError } = await admin
-    .from("applications")
-    .update({ screening_status: "PROCESSING" })
-    .eq("id", applicationId)
-    .in("screening_status", ["PENDING", "ERROR"])
-    .select("id");
-  if (claimError) throw new Error(`Claim failed: ${claimError.message}`);
-  if ((claimed?.length ?? 0) === 0) {
+  const claimed = await asAdmin((db) =>
+    db.query<{ id: string }>(
+      `update public.applications
+          set screening_status = 'PROCESSING'
+        where id = $1
+          and screening_status in ('PENDING', 'ERROR')
+        returning id`,
+      [applicationId],
+    ),
+  );
+  if (claimed.length === 0) {
     console.log(`[screening] ${applicationId} already processing or done`);
     return;
   }
 
-  // 2. Load the application and its job (two PK lookups, avoids embed typing).
-  const { data: app, error: appError } = await admin
-    .from("applications")
-    .select("resume_path, stage, job_id")
-    .eq("id", applicationId)
-    .single();
-  if (appError || !app) {
+  // 2. Load the application and its job in one go.
+  const context = await asAdmin((db) =>
+    db.one<{
+      resume_path: string | null;
+      stage: string;
+      title: string;
+      description: string;
+      requirements: string;
+    }>(
+      `select a.resume_path, a.stage, j.title, j.description, j.requirements
+         from public.applications a
+         join public.jobs j on j.id = a.job_id
+        where a.id = $1`,
+      [applicationId],
+    ),
+  );
+  if (!context) {
     await markError();
     throw new PermanentError(`Application ${applicationId} not found.`);
   }
-  if (!app.resume_path) {
+  if (!context.resume_path) {
     await markError();
     throw new PermanentError(`Application ${applicationId} has no resume.`);
-  }
-
-  const { data: job, error: jobError } = await admin
-    .from("jobs")
-    .select("title, description, requirements")
-    .eq("id", app.job_id)
-    .single();
-  if (jobError || !job) {
-    await markError();
-    throw new PermanentError(`Job ${app.job_id} not found.`);
   }
 
   // 3. Extract resume text. A bad, empty or scanned file will not improve on a
   //    retry, so this is permanent.
   let resumeText: string;
   try {
-    resumeText = await extractResumeText(app.resume_path);
+    resumeText = await extractResumeText(context.resume_path);
   } catch (err) {
     await markError();
     throw new PermanentError(
@@ -118,28 +120,38 @@ async function screenOne(applicationId: string): Promise<void> {
 
   // 4. Screen with the AI (structured output).
   const result = await screenResume({
-    jobTitle: job.title,
-    jobDescription: job.description,
-    requirements: job.requirements,
+    jobTitle: context.title,
+    jobDescription: context.description,
+    requirements: context.requirements,
     resumeText,
   });
 
   // 5. Persist. Advance APPLIED -> SCREENED only; never pull a candidate back
   //    from a stage the employer has already moved them to (e.g. on re-screen).
-  const { error: persistError } = await admin
-    .from("applications")
-    .update({
-      ai_score: result.score,
-      ai_recommendation: result.recommendation,
-      ai_summary: result.summary,
-      ai_matched: result.matched,
-      ai_missing: result.missing,
-      ai_flags: result.flags,
-      screening_status: "DONE",
-      stage: app.stage === "APPLIED" ? "SCREENED" : app.stage,
-    })
-    .eq("id", applicationId);
-  if (persistError) throw new Error(`Persist failed: ${persistError.message}`);
+  await asAdmin((db) =>
+    db.query(
+      `update public.applications
+          set ai_score = $2,
+              ai_recommendation = $3::public.ai_recommendation,
+              ai_summary = $4,
+              ai_matched = $5::jsonb,
+              ai_missing = $6::jsonb,
+              ai_flags = $7::jsonb,
+              screening_status = 'DONE',
+              stage = case when stage = 'APPLIED' then 'SCREENED'::public.application_stage
+                           else stage end
+        where id = $1`,
+      [
+        applicationId,
+        result.score,
+        result.recommendation,
+        result.summary,
+        JSON.stringify(result.matched),
+        JSON.stringify(result.missing),
+        JSON.stringify(result.flags),
+      ],
+    ),
+  );
 
   console.log(
     `[screening] ${applicationId} scored ${result.score} ${result.recommendation}`,

@@ -5,9 +5,9 @@
 A full-stack job board and applicant tracking system. Applicants apply with a resume; an AI screens each one against the job's requirements and produces an explainable match score; employers review candidates ranked by that score and move them through a hiring pipeline. The AI advises - it never decides.
 
 - **Live demo:** https://talent-screen.vercel.app
-- **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Supabase - Inngest - Anthropic - Resend
+- **Stack:** Next.js 16 (App Router, RSC) - React 19 - TypeScript - Tailwind v4 - Neon Postgres - AWS (Cognito, S3, SQS, Lambda, Terraform) - Anthropic - Resend
 
-> Portfolio project. The end-to-end flow (and how Inngest + Resend fit in) is documented in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+> Portfolio project. The end-to-end flow (and how the SQS + Lambda workers fit in) is documented in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ### Demo accounts
 
@@ -29,12 +29,12 @@ The screening AI is a **decision-support tool, not the decision-maker** - this i
 
 ## Features
 
-- **Auth and roles** (employer vs. applicant) with Postgres Row Level Security as the security boundary.
+- **Auth and roles** (employer vs. applicant) via AWS Cognito, with Postgres Row Level Security as the security boundary.
 - **Employers:** post, edit, close/reopen, and expire jobs.
 - **Applicants:** upload a resume (PDF/DOCX), apply in one click, and track each application's stage + screening status.
 - **AI screening pipeline:** runs in the background on apply - downloads the resume, extracts its text, calls the AI, and persists an explainable score.
 - **Hiring pipeline:** per-job applicant table (sortable recommended-first, filterable by stage), a drag-and-drop Kanban board, and a candidate detail view with an inline resume preview, the AI breakdown, stage controls, and a manual re-screen.
-- **Transactional email** (Resend): application-received and stage-change notifications.
+- **Transactional email** (Resend): an application-received confirmation, plus hiring emails an employer composes and sends deliberately.
 
 ## How the AI screening works
 
@@ -42,9 +42,9 @@ Screening is a background job so the apply request stays fast and the work is re
 
 ```mermaid
 flowchart LR
-  A[Applicant clicks Apply] --> B[Application row created<br/>resume snapshotted to Storage]
-  B --> C[Emit application/submitted event]
-  C --> D{Inngest worker}
+  A[Applicant clicks Apply] --> B[Application row created<br/>resume snapshotted to S3]
+  B --> C[SendMessage to screening-queue<br/>and email-queue]
+  C --> D{Lambda: screening worker}
   D --> E[Claim: PENDING -> PROCESSING<br/>atomic, idempotent]
   E --> F[Download resume + extract text<br/>unpdf / mammoth]
   F --> G[AI model<br/>structured-output screening]
@@ -52,9 +52,10 @@ flowchart LR
   H --> I[Employer reviews + decides]
 ```
 
-- **Claim step** does an atomic `PENDING|ERROR -> PROCESSING` update, so a duplicate or retried event can't double-process.
-- **Retries** with backoff are built in; on exhaustion the row is set to `ERROR` and surfaced in the UI.
-- The worker runs on the **Node runtime** with the Supabase **service role** (it bypasses RLS deliberately, behind a signed Inngest endpoint).
+- **Claim step** does an atomic `PENDING|ERROR -> PROCESSING` update. SQS standard queues deliver at least once, so a duplicate is expected rather than exceptional; a redelivery claims nothing and exits.
+- **Retries** are the SQS event source mapping's job. Unfixable input (no resume, a scanned image) marks the row `ERROR` and is deleted rather than retried; a transient failure is redelivered up to 3 times, then lands in a **dead-letter queue** with a CloudWatch alarm on it.
+- **Two queues, not one fan-out.** Only the apply path writes to the email queue, so a re-screen re-scores without re-sending the applicant's confirmation email.
+- The worker runs on **Lambda (Node 22)** as the database **owner role**, which bypasses RLS deliberately, reading its secrets from **SSM Parameter Store** at cold start. It reads the resume from a private **S3** bucket.
 
 ## Tech stack
 
@@ -62,17 +63,20 @@ flowchart LR
 | --- | --- |
 | Framework | Next.js 16 (App Router, React Server Components, Server Actions, Turbopack) |
 | Language / UI | TypeScript, React 19, Tailwind CSS v4 |
-| Data / auth / files | Supabase (Postgres, Auth, Storage) with Row Level Security |
-| Background jobs | Inngest (retries, concurrency, idempotency, dashboard) |
+| Database | Neon Postgres with Row Level Security |
+| Auth | AWS Cognito (user pool, httpOnly-cookie sessions) |
+| File storage | AWS S3 (private bucket, presigned POST uploads) |
+| Background jobs | AWS SQS + Lambda (two queues, dead-letter queues, at-least-once with an idempotent DB claim) |
 | AI | Anthropic API with structured outputs |
 | Resume parsing | `unpdf` (PDF) + `mammoth` (DOCX) |
 | Drag-and-drop | `@dnd-kit/core` |
 | Email | Resend |
-| Hosting | Vercel |
+| Hosting | Vercel (app) + AWS (workers) |
+| Infrastructure as code | Terraform (`infra/`) |
 
 ## Local development
 
-**Prerequisites:** Node 22+ (`.nvmrc` pins 22), and a Supabase project. API keys for Anthropic (and optionally Resend) to exercise screening and email.
+**Prerequisites:** Node 22+ (`.nvmrc` pins 22), a Neon database, and the AWS stack from `infra/` (Cognito, S3, SQS, Lambda). API keys for Anthropic (and optionally Resend) to exercise screening and email.
 
 ```bash
 # 1. Install
@@ -83,16 +87,17 @@ cp .env.example .env.local
 # then fill in the values (see the table below)
 
 # 3. Database
-#    Run the SQL files in supabase/migrations/ in order (Supabase SQL editor
-#    or `supabase db push`), which also creates the private `resumes` bucket.
+#    Apply the schema to a fresh Neon database:
+#      psql "$DATABASE_URL_UNPOOLED" -f db/migrations/0001_init.sql
+#    Then create the app_user role it grants to (see db/README.md).
 
 # 4. Run the app
 npm run dev                 # http://localhost:3000
 
-# 5. Run the background-jobs dev server (separate terminal) for screening/email
-npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+#    With QUEUE_LOCAL=1 (see .env.example) the background workers run
+#    in-process, so no second terminal and no AWS access are needed.
 
-# 6. (Optional) Seed demo data: an employer + a dozen jobs + pre-screened applicants
+# 5. (Optional) Seed demo data: an employer + a dozen jobs + pre-screened applicants
 node --env-file=.env.local scripts/seed.mjs
 ```
 
@@ -100,16 +105,21 @@ node --env-file=.env.local scripts/seed.mjs
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase publishable/anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; signed URLs + the screening worker |
+| `APP_DATABASE_URL` | yes | Neon, as `app_user`. **RLS applies.** All user traffic |
+| `DATABASE_URL` | yes | Neon, as the owner. **RLS bypassed.** Admin paths only |
+| `DATABASE_URL_UNPOOLED` | migrations | Direct endpoint, bypasses PgBouncer |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` / `COGNITO_CLIENT_SECRET` | yes | From `terraform output` |
+| `COGNITO_HOSTED_DOMAIN` | for Google sign-in | From `terraform output cognito_hosted_domain`. Doubles as the feature flag: the Google button renders only when set |
+| `RESUME_BUCKET` | yes | Private S3 bucket for resumes |
 | `ANTHROPIC_API_KEY` | for screening | Anthropic API key |
-| `INNGEST_DEV` | local | Set to `1` for the local Inngest dev server |
-| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | prod | Injected by the Inngest Vercel integration |
+| `QUEUE_LOCAL` | local | Set to `1` to run the workers in-process instead of via SQS |
+| `SCREENING_QUEUE_URL` / `EMAIL_QUEUE_URL` | prod | From `terraform output` in `infra/` |
+| `SQS_ACCESS_KEY_ID` / `SQS_SECRET_ACCESS_KEY` | prod | Publish-only IAM user; `sqs:SendMessage` on those two queues and nothing else. `SQS_` prefix because Lambda reserves the `AWS_` names |
+| `SQS_REGION` | prod | e.g. `ap-southeast-1` |
 | `RESEND_API_KEY` | for email | Resend key; emails no-op if unset |
 | `RESEND_FROM` | for email | Verified sender, e.g. `"TalentScreen <you@domain.com>"` |
 | `NEXT_PUBLIC_SITE_URL` | for email links | Public base URL used in email links |
-| `CRON_SECRET` | keep-alive | Gates the `/api/health` keep-alive ping |
+| `CRON_SECRET` | optional | Gates the `/api/health` liveness endpoint |
 
 > Without `ANTHROPIC_API_KEY` / `RESEND_API_KEY`, the app still runs - the screening and email steps degrade gracefully (screening errors are surfaced; emails are skipped).
 
@@ -125,4 +135,9 @@ npm run build        # production build
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run format       # prettier --write
+npm run build:workers # bundle the Lambda workers, fails past Lambda's 50 MB limit
+npm run check:queue  # assert only the apply path reaches the email queue
+npm run check:rls    # assert RLS denies cross-tenant reads and writes
+npm run check:auth   # assert Cognito sign-up/in/refresh and the role claim
+npm run eval         # run the screening evals against the real model
 ```
