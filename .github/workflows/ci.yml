@@ -1,0 +1,82 @@
+name: CI/CD
+
+# Every pull request runs the checks. Landing on main runs them again and,
+# only if they pass, deploys to Vercel production.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per branch. A newer push makes an in-flight run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npm run typecheck
+
+      # Two separate queues exist so that re-screening a job cannot re-send the
+      # applicant's confirmation email. Nothing in the type system says so, and
+      # the bug it prevents is silent, so assert the routing directly.
+      - name: Queue routing
+        run: npm run check:queue
+
+      # Catches a worker outgrowing Lambda's size limit here, rather than
+      # halfway through a terraform apply that then has to be unpicked.
+      - name: Worker bundles
+        run: npm run build:workers
+
+      - name: Build
+        run: npm run build
+
+      # Project rule: plain hyphens only, no em or en dashes anywhere.
+      - name: No em dashes
+        run: |
+          if git grep -nP '[\x{2014}\x{2013}]' -- .; then
+            echo "::error::Found an em or en dash. Use a plain hyphen, or rephrase."
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy to production
+    needs: check
+    # Only a real landing on main. Pull requests stop at the checks above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.vercel.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Vercel builds the app itself, so there is nothing to install here. That
+      # also means production is built by the same pipeline that serves it,
+      # rather than from an artifact this runner produced.
+      - name: Deploy
+        id: vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # Identifiers, not credentials. They are useless without the token.
+          VERCEL_ORG_ID: team_q2zZtMDS3OnoGN4s1uS74YER
+          VERCEL_PROJECT_ID: prj_nR8O6v8w41nxMQv2RnweEjcNq0e2
+        run: |
+          url=$(npx --yes vercel@60 deploy --prod --yes --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"

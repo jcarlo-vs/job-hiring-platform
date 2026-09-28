@@ -1,0 +1,360 @@
+.wrap {
+  display: grid;
+  gap: 1.75rem;
+}
+
+/* ---- the rail ----------------------------------------------------------
+   One point of light walks the rail, pausing on each checkpoint. The line
+   fills in behind it, so the path is drawn rather than just highlighted. */
+
+.rail {
+  --gap: 0.5rem;
+  /* Half a column: the gap between the rail edge and the first puck's centre.
+     10% only approximates this - with a column gap the first centre sits at
+     (100% - 4 * gap) / 10, which is what makes checkpoint n land on exactly
+     n * 25% of the line below. */
+  --inset: calc((100% - 4 * var(--gap)) / 10);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--gap);
+  padding-block: 0.5rem;
+  /* An <ol> carries 40px of inline padding from the UA sheet. The pucks live
+     in the content box but the line is positioned against the padding box, so
+     leaving it in slides the whole rail off the checkpoints. */
+  padding-inline: 0;
+  list-style: none;
+  margin: 0;
+}
+
+/* Begins at the first puck's centre and ends at the last one's. */
+.track {
+  position: absolute;
+  top: 2.05rem;
+  left: var(--inset);
+  right: var(--inset);
+  height: 3px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+/* Spans exactly first-puck-centre to last-puck-centre, so every percentage
+   inside it is a percentage of the line rather than of the whole rail. The
+   trail lives in here for that reason: as a sibling of the rail its width was
+   a share of the full width and overshot the checkpoint it was meant to reach. */
+.spark {
+  position: absolute;
+  top: 2.05rem;
+  left: var(--inset);
+  right: var(--inset);
+  height: 3px;
+  pointer-events: none;
+  /* Behind the checkpoints. The spark slides out from under one circle and
+     disappears under the next, so nothing is ever drawn across a circle. */
+  z-index: 0;
+}
+
+.trail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--stage, var(--primary));
+  width: 0;
+  transition:
+    width var(--travel, 1500ms) cubic-bezier(0.45, 0, 0.25, 1),
+    background 900ms ease;
+}
+
+.sparkDot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  margin-top: -5.5px;
+  margin-left: -5.5px;
+  border-radius: 999px;
+  background: var(--stage, var(--primary));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--stage, var(--primary)) 18%, transparent),
+    0 0 16px 3px
+      color-mix(in srgb, var(--stage, var(--primary)) 65%, transparent);
+  /* Gone while resting on a checkpoint. The circle would cover it anyway, but
+     fading it out means a stray pixel can never peek out from behind one.
+     The fade is short enough to be lit by the time it clears the circle. */
+  opacity: 0;
+  transition:
+    left var(--travel, 1500ms) cubic-bezier(0.45, 0, 0.25, 1),
+    background 900ms ease,
+    box-shadow 900ms ease,
+    opacity 120ms ease;
+}
+
+/* A short comet tail, so the direction of travel is unmistakable. */
+.sparkTail {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 3px;
+  width: 0;
+  margin-top: -1.5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--stage, var(--primary)));
+  /* Hangs behind the dot: the element sits to the left of its own position
+     with its bright end flush against the dot, whatever the current width. */
+  transform: translateX(-100%);
+  opacity: 0;
+  transition:
+    left var(--travel, 1500ms) cubic-bezier(0.45, 0, 0.25, 1),
+    width 420ms ease,
+    background 900ms ease,
+    opacity 320ms ease;
+}
+
+/* Both only exist mid-crossing. */
+.flying .sparkDot {
+  opacity: 1;
+}
+
+.flying .sparkTail {
+  width: 2.9rem;
+  opacity: 0.8;
+}
+
+/* Looping home: jump back with no transition. Sliding all the way back would
+   read as the process running in reverse. */
+.warping .sparkDot,
+.warping .sparkTail,
+.warping .trail {
+  transition: none;
+}
+
+.stage {
+  --stage: var(--primary);
+  position: relative;
+  /* Above the line and the spark, and opaque, so the rail passes behind. */
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding-inline: 0.25rem;
+}
+
+.puck {
+  position: relative;
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--background);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color 700ms ease,
+    color 700ms ease,
+    background 700ms ease,
+    transform 700ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.puck svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* Already visited: keeps its colour, quietly. */
+.done .puck {
+  border-color: var(--stage);
+  color: var(--stage);
+  background: color-mix(in srgb, var(--stage) 12%, var(--background));
+}
+
+/* The light has landed here. */
+.active .puck {
+  border-color: var(--stage);
+  background: var(--stage);
+  color: #fff;
+  transform: scale(1.16);
+}
+
+/* One slow breath while it rests here, then it moves on. Deliberately gentle:
+   a fast blink reads as an error state. */
+.active .puck::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 999px;
+  border: 2px solid var(--stage);
+  opacity: 0;
+  animation: breathe var(--beat, 1560ms) ease-out infinite;
+}
+
+@keyframes breathe {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+.label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--muted);
+  transition: color 700ms ease;
+  max-width: 9rem;
+}
+
+.done .label {
+  color: var(--foreground);
+}
+
+.active .label {
+  color: var(--stage);
+}
+
+.paused .active .puck::after {
+  animation-play-state: paused;
+}
+
+/* ---- the caption under the rail ---------------------------------------- */
+
+.caption {
+  min-height: 4.25rem;
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 1rem);
+  background: var(--background);
+}
+
+.captionTitle {
+  font-family: var(--font-display), var(--font-body), system-ui, sans-serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.captionBody {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+
+.captionBody b {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* ---- controls ---------------------------------------------------------- */
+
+.foot {
+  --stage: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.timing {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.timing b {
+  color: var(--stage, var(--primary));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.toggle {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.toggle:hover {
+  color: var(--foreground);
+  border-color: var(--muted);
+}
+
+/* ---- narrow screens ----------------------------------------------------
+   Five stages across a phone is unreadable, so the rail becomes a column and
+   the connecting line turns vertical. */
+
+@media (max-width: 640px) {
+  .rail {
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+    padding-left: 0.25rem;
+  }
+
+  .track {
+    top: 1.3rem;
+    bottom: 1.3rem;
+    left: 1.3rem;
+    right: auto;
+    width: 3px;
+    height: auto;
+  }
+
+  /* Takes the trail, tail and dot with it - they are all children now. */
+  .spark {
+    display: none;
+  }
+
+  .stage {
+    grid-template-columns: 2.6rem 1fr;
+    justify-items: start;
+    align-items: center;
+    text-align: left;
+    gap: 0.85rem;
+  }
+
+  .label {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puck,
+  .label {
+    transition: none;
+  }
+
+  .active .puck::after {
+    animation: none;
+  }
+
+  .sparkDot,
+  .sparkTail,
+  .trail {
+    transition: none;
+  }
+}
