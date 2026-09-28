@@ -165,13 +165,13 @@ const STAGES: Stage[] = [
 ];
 
 /**
- * The 0.6x setting from the pacing prototype: brisk enough to hold attention,
- * still slow enough that the rest on each checkpoint reads as a stop rather
- * than a flicker. A full lap takes a shade under twelve seconds.
+ * Brisk. The rest on each checkpoint is still long enough to read as a stop
+ * rather than a flicker, but a full lap now takes about seven seconds, so a
+ * visitor sees the whole process without deciding to wait for it.
  */
-const TRAVEL = 900;
-const DWELL = 1560;
-const WARP_OUT = 250;
+const TRAVEL = 540;
+const DWELL = 936;
+const WARP_OUT = 150;
 
 export function FlowDiagram() {
   /** Which checkpoint the light is on, or heading toward. */
