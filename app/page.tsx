@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { FlowDiagram } from "@/components/flow-diagram";
 import { UserMenu } from "@/components/user-menu";
 import { getProfile } from "@/lib/auth";
 
@@ -16,24 +17,6 @@ const candidates = [
   { initials: "DR", name: "Daniel Reyes", role: "Product Designer", score: 88 },
   { initials: "PN", name: "Priya Nair", role: "Backend Engineer", score: 81 },
   { initials: "ML", name: "Marcus Lee", role: "Data Analyst", score: 73 },
-];
-
-const steps = [
-  {
-    n: "1",
-    title: "Write your criteria",
-    body: "Post the role and its must-have requirements in a couple of minutes.",
-  },
-  {
-    n: "2",
-    title: "Applicants apply",
-    body: "Candidates upload a resume and apply in one click; screening fires instantly in the background.",
-  },
-  {
-    n: "3",
-    title: "Review and decide",
-    body: "See everyone ranked by an explainable match score, then move them through your pipeline.",
-  },
 ];
 
 const testimonials = [
@@ -242,18 +225,8 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className={styles.howGrid}>
-            <ol className={styles.steps}>
-              {steps.map((s) => (
-                <li key={s.n} className={styles.step}>
-                  <span className={styles.stepNum}>{s.n}</span>
-                  <div className={styles.stepBody}>
-                    <h3>{s.title}</h3>
-                    <p>{s.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+          <div className={styles.howStack}>
+            <FlowDiagram />
 
             <div className={styles.appPanel}>
               <div className={styles.appChrome}>
